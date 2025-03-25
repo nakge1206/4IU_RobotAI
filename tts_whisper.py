@@ -5,7 +5,7 @@ import threading
 
 client = OpenAI()
 
-def play_text_as_speech(text: str, speed: float = 1.1, voice: str = "alloy", model: str = "tts-1"):
+def play_text_as_speech(text: str, speed: float = 1.1, voice: str = "alloy", model: str = "tts-1", on_complete=None):
     """
     주어진 텍스트를 음성으로 변환하여 음성을 바로 재생합니다.
     백그라운드 스레드에서 음성을 생성하고 재생합니다.
@@ -39,6 +39,8 @@ def play_text_as_speech(text: str, speed: float = 1.1, voice: str = "alloy", mod
         # 음성이 끝날 때까지 기다리기
         while pygame.mixer.music.get_busy():
             pygame.time.Clock().tick(10)
+        if on_complete:
+            on_complete()
 
     # 음성 생성 및 재생을 별도의 스레드에서 실행
     threading.Thread(target=generate_and_play_speech).start()
