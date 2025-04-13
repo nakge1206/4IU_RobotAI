@@ -1,6 +1,6 @@
 # service.py
 from realtime_stt_test import STTWrapper
-from tts import TTSClient
+from tts_module import TTSClient
 import threading
 
 results = []
