@@ -55,20 +55,31 @@ class TTSServer:
                 threading.Thread(target=self.handle_client, args=(conn, addr)).start()
 
 class TTSClient:
-    """TTS 클라이언트 클래스"""
-    def __init__(self, host='127.0.0.1', port=65432):
+    def __init__(self, host='127.0.0.1', port=65432, on_done=None):
         self.host = host
         self.port = port
+        self.on_done = on_done
 
-    def send(self, text: str):
-        """문장을 서버에 전송"""
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.connect((self.host, self.port))
-                s.sendall(text.encode('utf-8'))
-        except ConnectionRefusedError:
-            print("❌ TTS 서버가 켜져 있는지 확인하세요! (TTSServer.start 실행 필요)")
+    def connect(self):
+        pass  # 현재는 사용 안 함 (연결은 send 시마다 새로 함)
 
+    def send_text(self, text: str):
+        def _send():
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.connect((self.host, self.port))
+                    s.sendall(text.encode('utf-8'))
+                    # TTS 음성 길이만큼 대기 후 on_done 콜백 호출
+                    time.sleep(len(text) * 0.1 + 0.5)  # 대략적으로 시간 예측
+                    if self.on_done:
+                        self.on_done()
+            except ConnectionRefusedError:
+                print("❌ TTS 서버가 켜져 있는지 확인하세요!")
+
+        threading.Thread(target=_send, daemon=True).start()
+
+
+        
 # 🧪 테스트 실행
 if __name__ == "__main__":
     server = TTSServer()
