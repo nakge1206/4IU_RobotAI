@@ -1,0 +1,10 @@
+# logs
+realtimesst.log*
+
+# environment variables
+.env
+.env.production
+
+# macOS
+.DS_Store
+
