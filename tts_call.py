@@ -1,5 +1,5 @@
 # tts_call.py
-from tts_client import play_with_tts
+from tts_module import play
 import time
 
 # 📂 텍스트 파일 경로
@@ -12,5 +12,5 @@ with open(filepath, "r", encoding="utf-8") as file:
 # 🔊 한 문장씩 TTS 서버로 보내기
 for sentence in lines:
     print(f"📤 전송 중: {sentence}")
-    play_with_tts(sentence)
+    play(sentence)
     time.sleep(0.4)  # 문장 사이 템포 조절
