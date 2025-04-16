@@ -3,6 +3,11 @@ from realtime_stt_module import STTWrapper
 from realtime_tts_module import TTSClient
 import threading
 
+'''
+git알려주기위해 일부러 수정한 부분.
+나중에 누가 본다면 지워서 git 연습해보길~
+'''
+
 class ConversationService:
     def __init__(self):
         # 결과 저장용
