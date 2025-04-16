@@ -2,13 +2,13 @@
 import socket
 import threading
 import time
-from RealtimeTTS.engines import EdgeEngine
+from RealtimeTTS.engines import BaseEngine
 from RealtimeTTS import TextToAudioStream
 
 class TTSHandler:
     """TTS 스트리밍 엔진 초기화 및 재생 처리"""
     def __init__(self, voice="ko-KR-SoonBokNeural"):
-        self.engine = EdgeEngine()
+        self.engine = BaseEngine()
         self.engine.set_voice(voice)
         self.stream = TextToAudioStream(self.engine)
         self.warm_up()
