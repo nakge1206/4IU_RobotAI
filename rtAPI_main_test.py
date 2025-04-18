@@ -8,7 +8,7 @@ def main():
     tts.connect()
 
     def handle_stt_text(text):
-        print(f"🎤 STT 인식 결과: {text}")
+        print(f"STT 인식 결과: {text}")
         tts.send_text(text)
 
     stt = STTClient(on_text_callback=handle_stt_text)

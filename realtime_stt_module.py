@@ -2,14 +2,14 @@ from RealtimeSTT import AudioToTextRecorder
 import threading
 
 class STTWrapper:
-    def __init__(self, on_text_callback, model="base", language="ko", print_transcription_time=True, enable_realtime_transcription=True, use_main_model_for_realtime=True):
+    def __init__(self, on_text_callback):
         self.on_text_callback = on_text_callback
         self.recorder = AudioToTextRecorder(
-            model=model, 
-            language=language, 
-            enable_realtime_transcription=enable_realtime_transcription,
-            use_main_model_for_realtime=use_main_model_for_realtime,
-            print_transcription_time=print_transcription_time,
+            model="base", 
+            language="ko", 
+            print_transcription_time=True, #지연율 출력
+            enable_realtime_transcription=False, #입력 중에도 결과 업데이트
+            use_main_model_for_realtime=False, #실시간 적용을 보조모델이 아닌, 메인모델 사용
             on_realtime_transcription_stabilized=self.on_text_callback
         )
         self.running = False
