@@ -1,5 +1,6 @@
 # logs
 realtimesst.log*
+__pycache__/
 
 # environment variables
 .env
@@ -7,4 +8,5 @@ realtimesst.log*
 
 # macOS
 .DS_Store
+
 
