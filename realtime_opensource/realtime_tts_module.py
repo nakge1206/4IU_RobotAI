@@ -20,7 +20,7 @@ class TTSHandler:
         if self.stream.play_thread:
             self.stream.play_thread.join()
 
-    def play(self, text: str):
+    def play(self, text: str, on_done=None):
         """문장을 TTS로 재생"""
         self.stream.feed(text)
         self.stream.play_async()
@@ -41,8 +41,9 @@ class TTSServer:
             if not data:
                 return
             text = data.decode('utf-8').strip()
-            print(f"📥 받은 문장: {text}")
+            print(f"받은 문장: {text}")
             self.tts.play(text)
+            conn.sendall(b"done")  #재생 완료 응답 전송
 
     def start(self):
         """TTS 서버 시작"""
@@ -69,9 +70,9 @@ class TTSClient:
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                     s.connect((self.host, self.port))
                     s.sendall(text.encode('utf-8'))
-                    # TTS 음성 길이만큼 대기 후 on_done 콜백 호출
-                    time.sleep(len(text) * 0.1 + 0.5)  # 대략적으로 시간 예측
-                    if self.on_done:
+                    
+                    done_signal = s.recv(1024).decode()
+                    if done_signal.strip() == "done" and self.on_done:
                         self.on_done()
             except ConnectionRefusedError:
                 print("❌ TTS 서버가 켜져 있는지 확인하세요!")
