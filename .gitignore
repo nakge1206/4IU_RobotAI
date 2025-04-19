@@ -1,5 +1,7 @@
 # logs
 realtimesst.log*
+
+#.pyc
 __pycache__/
 
 # environment variables
