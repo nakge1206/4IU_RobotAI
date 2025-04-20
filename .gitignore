@@ -11,4 +11,8 @@ __pycache__/
 # macOS
 .DS_Store
 
+#stt module
+RealtimeSTT/
+SenseVoice
+
 
