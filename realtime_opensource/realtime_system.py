@@ -18,7 +18,6 @@ class ConversationService:
         # 결과 저장용
         self.results = []
         self.is_tts_running = False
-        self.tts_lock = threading.Lock()
         # TTS가 끝나면 STT 다시 시작하는 콜백 연결
         self.tts = TTSClient(on_done=self.resume_stt)
         # STT에서 텍스트를 받으면 handle_stt 실행
@@ -30,20 +29,17 @@ class ConversationService:
         self.stt.start()
 
     def handle_stt(self, text):
-        with self.tts_lock:
-            if self.is_tts_running:
-                print(f"\n[무시됨] STT 결과 (TTS 중): {text}")
-                return
-            print(f"\n음성 인식: {text}")
-            self.results.append(text)
-            self.is_tts_running = True
-
+        self.is_tts_running = True
+        if self.is_tts_running:
+            self.stt.pause()
+        print(f"\n음성 인식: {text}")
+        self.results.append(text)
         self.tts.send_text(text)
 
     def resume_stt(self):
-        with self.tts_lock:
-            print("TTS 완료 → STT 재시작")
-            self.is_tts_running = False
+        self.is_tts_running = False
+        self.stt.resume()
+            
 
 
 
