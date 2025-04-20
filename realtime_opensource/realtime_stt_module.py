@@ -10,7 +10,7 @@
 
 
 from RealtimeSTT import AudioToTextRecorder
-import threading
+import time
 
 class STTWrapper:
     def __init__(self, on_text_callback):
@@ -20,27 +20,25 @@ class STTWrapper:
             language="ko", 
             print_transcription_time=False, #지연율 출력
         )
-        self.running = False
-        self.thread = None
     #Options: 'tiny', 'tiny.en', 'base', 'base.en', 'small', 'small.en', 'medium', 'medium.en', 'large-v1', 'large-v2'.
     # tiny : 0.8초 지연, 정확도는 썩음
     # base : 1.5초 지연, 정확도는 썩 좋지 않음
     # small : 4초 지연, 정확도는 꽤 좋음
 
     def _run(self):
-        while self.running:
-            result = self.recorder.text()
-            if result:
-                self.on_text_callback(result)
+        result = self.recorder.text()
+        if result:
+            self.on_text_callback(result)
 
     def start(self):
-        if not self.running:
-            self.running = True
-            # self.thread = threading.Thread(target=self._run, daemon=True)
-            # self.thread.start()
-            self._run()
+        self._run()
 
     def stop(self):
-        self.running = False
-        if self.thread and self.thread.is_alive():
-            self.thread.join(timeout=1.0)
+        self.recorder.abort()
+
+    def pause(self):
+        self.recorder.set_microphone(False)
+
+    def resume(self):
+        self.recorder.set_microphone(True)
+        self._run()
