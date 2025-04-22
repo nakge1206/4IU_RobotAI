@@ -1,7 +1,6 @@
 # service.py
 from realtime_stt_module import STTWrapper
 from realtime_tts_module import TTSClient
-import threading
 
 '''
 git알려주기위해 일부러 수정한 부분.
@@ -32,7 +31,7 @@ class ConversationService:
         self.is_tts_running = True
         if self.is_tts_running:
             self.stt.pause()
-        print(f"\n음성 인식: {text}")
+        #print(f"\n음성 인식: {text}")
         self.results.append(text)
         self.tts.send_text(text)
 
