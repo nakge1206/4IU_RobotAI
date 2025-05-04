@@ -13,6 +13,7 @@
 '''
 
 
+#from audio_recorder import AudioToTextRecorder
 from audio_recorder import AudioToTextRecorder
 import time
 
@@ -31,19 +32,21 @@ class STTWrapper:
     # small : 4초 지연, 정확도는 꽤 좋음
 
     def _run(self):
-        result, info = self.recorder.text()
-        '''
-        info의 내용
-        language
-        emotion
-        event
-        itn
-        '''
-        emotion = info.get("emotion") if info else "감정 비어있음"
-        event = info.get("event") if info else "이벤트 비어있음"
-        print(f"텍스트: {result}")
-        print(f"감정: {emotion}")
-        print(f"이벤트: {event}")
+        # result, info = self.recorder.text()
+        # '''
+        # info의 내용
+        # language
+        # emotion
+        # event
+        # itn
+        # '''
+        # emotion = info.get("emotion") if info else "감정 비어있음"
+        # event = info.get("event") if info else "이벤트 비어있음"
+        # print(f"텍스트: {result}")
+        # print(f"감정: {emotion}")
+        # print(f"이벤트: {event}")
+        result = self.recorder.text()
+        print(result)
         if result:
             self.on_text_callback(result)
 
