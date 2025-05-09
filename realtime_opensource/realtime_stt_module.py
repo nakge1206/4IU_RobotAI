@@ -13,7 +13,6 @@
 '''
 
 
-#from audio_recorder import AudioToTextRecorder
 from audio_recorder import AudioToTextRecorder
 import time
 
@@ -21,7 +20,6 @@ class STTWrapper:
     def __init__(self, on_text_callback):
         self.on_text_callback = on_text_callback
         self.recorder = AudioToTextRecorder(
-            model="base", 
             language="ko", 
             print_transcription_time=True, #지연율 출력
             silero_deactivity_detection=True
