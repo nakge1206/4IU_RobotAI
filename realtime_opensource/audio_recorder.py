@@ -58,8 +58,6 @@ logger.propagate = False
 # Set OpenMP runtime duplicate library handling to OK (Use only for development!)
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 
-INIT_MODEL_TRANSCRIPTION = "tiny"
-INIT_MODEL_TRANSCRIPTION_REALTIME = "tiny"
 INIT_REALTIME_PROCESSING_PAUSE = 0.2
 INIT_REALTIME_INITIAL_PAUSE = 0.2
 INIT_SILERO_SENSITIVITY = 0.4
@@ -85,14 +83,12 @@ if platform.system() != 'Darwin':
 
 
 from funasr import AutoModel
-from funasr.utils.postprocess_utils import rich_transcription_postprocess
 
 class TranscriptionWorker:
-    def __init__(self, conn, stdout_pipe, model_path, compute_type, gpu_device_index, device,
+    def __init__(self, conn, stdout_pipe, compute_type, gpu_device_index, device,
                  ready_event, shutdown_event, interrupt_stop_event):
         self.conn = conn
         self.stdout_pipe = stdout_pipe
-        self.model_path = model_path
         self.compute_type = compute_type
         self.gpu_device_index = gpu_device_index
         self.device = device
@@ -157,7 +153,6 @@ class TranscriptionWorker:
                         )
 
                         # SenseVoice의 text 내 태그들을 구분하기 위한 함수.
-                        import re
                         def parse_sensevoice_tags(text):
                             tag_pattern = re.compile(r"<\|([^|]+)\|>")
                             tags = tag_pattern.findall(text)
@@ -218,7 +213,6 @@ class AudioToTextRecorder:
     """
 
     def __init__(self,
-                 model: str = INIT_MODEL_TRANSCRIPTION,
                  language: str = "",
                  compute_type: str = "default",
                  input_device_index: int = None,
@@ -520,7 +514,6 @@ class AudioToTextRecorder:
         self.on_wakeword_detection_end = on_wakeword_detection_end
         self.on_recorded_chunk = on_recorded_chunk
         self.on_transcription_start = on_transcription_start
-        self.main_model_type = model
         self.debug_mode = debug_mode
         self.handle_buffer_overflow = handle_buffer_overflow
         self.allowed_latency_limit = allowed_latency_limit
@@ -631,7 +624,6 @@ class AudioToTextRecorder:
                 args=(
                     child_transcription_pipe,        # 부모와 통신하는 Pipe. 부모에서 .send() → 자식에서 .recv()
                     child_stdout_pipe,               # 출력 내용을 부모에 보내는 용도의 Pipe
-                    self.main_model_type,            # 사용할 STT 모델 (예: "base", "small", "sensevoice-large")
                     self.compute_type,               # 예: "int8", "float16", "float32"
                     self.gpu_device_index,           # 사용할 GPU의 인덱스 (예: 0번 GPU)
                     self.device,                     # 최종 장치 설정 ("cpu" 또는 "cuda")
@@ -1412,9 +1404,9 @@ class AudioToTextRecorder:
 
                     if start_time:
                         if self.print_transcription_time:
-                            print(f"{self.main_model_type}모델 지연시간: {transcription_time:.2f} seconds")
+                            print(f"모델 지연시간: {transcription_time:.2f} seconds")
                         else:
-                            logger.debug(f"{self.main_model_type}모델 지연시간: {transcription_time:.2f} seconds")
+                            logger.debug(f"모델 지연시간: {transcription_time:.2f} seconds")
                     return "" if self.interrupt_stop_event.is_set() else (text, info) #인터럽트나면, 빈 문자열 반환
                 else:
                     logger.error(f"Transcription error: {result}")
