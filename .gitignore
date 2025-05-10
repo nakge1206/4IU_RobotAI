@@ -15,4 +15,6 @@ __pycache__/
 RealtimeSTT/
 SenseVoice
 
-
+#core
+gsq_finetuned_model/
+gsq_lora_adapter/
