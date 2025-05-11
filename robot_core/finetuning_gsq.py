@@ -2,6 +2,8 @@
 
 import os
 import json
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE" #추가
+
 import torch
 from datasets import Dataset, load_dataset
 from huggingface_hub import login

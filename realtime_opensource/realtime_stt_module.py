@@ -4,7 +4,9 @@
 
 
 from audio_recorder import AudioToTextRecorder
-import time
+import soundfile as sf
+import numpy as np
+
 
 class STTWrapper:
     def __init__(self, on_text_callback):
@@ -30,7 +32,7 @@ class STTWrapper:
         # print(f"감정: {emotion}")
         # print(f"이벤트: {event}")
         result = self.recorder.text()
-        print(result)
+        # print(result)
         if result:
             self.on_text_callback(result)
 
