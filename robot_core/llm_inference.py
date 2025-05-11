@@ -1,9 +1,11 @@
 import os
+os.environ['KMP_DUPLICATE_LIB_OK']='True'
 import re
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel, PeftConfig
 import time
+
 
 class LLMResponder:
     def __init__(self, model_path="Bllossom/llama-3.2-Korean-Bllossom-3B", adapter_path=None):
