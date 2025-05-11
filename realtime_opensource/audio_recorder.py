@@ -251,22 +251,22 @@ class AudioToTextRecorder:
                  on_vad_detect_stop=None,
 
                  # Wake word parameters
-                #  wakeword_backend: str = "",
-                #  openwakeword_model_paths: str = None,
-                #  openwakeword_inference_framework: str = "onnx",
-                #  wake_words: str = "",
-                #  wake_words_sensitivity: float = INIT_WAKE_WORDS_SENSITIVITY,
-                #  wake_word_activation_delay: float = (
-                #     INIT_WAKE_WORD_ACTIVATION_DELAY
-                #  ),
-                #  wake_word_timeout: float = INIT_WAKE_WORD_TIMEOUT,
-                #  wake_word_buffer_duration: float = INIT_WAKE_WORD_BUFFER_DURATION,
-                #  on_wakeword_detected=None,
-                #  on_wakeword_timeout=None,
-                #  on_wakeword_detection_start=None,
-                #  on_wakeword_detection_end=None,
-                #  on_recorded_chunk=None,
-                #  debug_mode=False,
+                 wakeword_backend: str = "",
+                 openwakeword_model_paths: str = None,
+                 openwakeword_inference_framework: str = "onnx",
+                 wake_words: str = "",
+                 wake_words_sensitivity: float = INIT_WAKE_WORDS_SENSITIVITY,
+                 wake_word_activation_delay: float = (
+                    INIT_WAKE_WORD_ACTIVATION_DELAY
+                 ),
+                 wake_word_timeout: float = INIT_WAKE_WORD_TIMEOUT,
+                 wake_word_buffer_duration: float = INIT_WAKE_WORD_BUFFER_DURATION,
+                 on_wakeword_detected=None,
+                 on_wakeword_timeout=None,
+                 on_wakeword_detection_start=None,
+                 on_wakeword_detection_end=None,
+                 on_recorded_chunk=None,
+                 debug_mode=False,
 
                  handle_buffer_overflow: bool = INIT_HANDLE_BUFFER_OVERFLOW,
                  buffer_size: int = BUFFER_SIZE,
@@ -489,10 +489,10 @@ class AudioToTextRecorder:
         self.input_device_index = input_device_index
         self.gpu_device_index = gpu_device_index
         self.device = device
-        # self.wake_words = wake_words
-        # self.wake_word_activation_delay = wake_word_activation_delay
-        # self.wake_word_timeout = wake_word_timeout
-        # self.wake_word_buffer_duration = wake_word_buffer_duration
+        self.wake_words = wake_words
+        self.wake_word_activation_delay = wake_word_activation_delay
+        self.wake_word_timeout = wake_word_timeout
+        self.wake_word_buffer_duration = wake_word_buffer_duration
         self.ensure_sentence_starting_uppercase = (
             ensure_sentence_starting_uppercase
         )
@@ -514,9 +514,9 @@ class AudioToTextRecorder:
         self.on_vad_detect_stop = on_vad_detect_stop
         # self.on_wakeword_detection_start = on_wakeword_detection_start
         # self.on_wakeword_detection_end = on_wakeword_detection_end
-        # self.on_recorded_chunk = on_recorded_chunk
+        self.on_recorded_chunk = on_recorded_chunk
         self.on_transcription_start = on_transcription_start
-        # self.debug_mode = debug_mode
+        self.debug_mode = debug_mode
         self.handle_buffer_overflow = handle_buffer_overflow
         self.allowed_latency_limit = allowed_latency_limit
 
@@ -555,7 +555,7 @@ class AudioToTextRecorder:
         self.backdate_resume_seconds = 0.0
         self.last_transcription_bytes = None
         self.last_transcription_bytes_b64 = None
-        # self.use_wake_words = wake_words or wakeword_backend in {'oww', 'openwakeword', 'openwakewords'}
+        self.use_wake_words = wake_words or wakeword_backend in {'oww', 'openwakeword', 'openwakewords'}
         self.detected_realtime_language = None
         self.detected_realtime_language_probability = 0
         self.transcription_lock = threading.Lock()
@@ -656,83 +656,83 @@ class AudioToTextRecorder:
             )
 
         # Setup wake word detection
-        # if wake_words or wakeword_backend in {'oww', 'openwakeword', 'openwakewords', 'pvp', 'pvporcupine'}:
-        #     self.wakeword_backend = wakeword_backend
+        if wake_words or wakeword_backend in {'oww', 'openwakeword', 'openwakewords', 'pvp', 'pvporcupine'}:
+            self.wakeword_backend = wakeword_backend
 
-        #     self.wake_words_list = [
-        #         word.strip() for word in wake_words.lower().split(',')
-        #     ]
-        #     self.wake_words_sensitivity = wake_words_sensitivity
-        #     self.wake_words_sensitivities = [
-        #         float(wake_words_sensitivity)
-        #         for _ in range(len(self.wake_words_list))
-        #     ]
+            self.wake_words_list = [
+                word.strip() for word in wake_words.lower().split(',')
+            ]
+            self.wake_words_sensitivity = wake_words_sensitivity
+            self.wake_words_sensitivities = [
+                float(wake_words_sensitivity)
+                for _ in range(len(self.wake_words_list))
+            ]
 
-        #     if self.wakeword_backend in {'pvp', 'pvporcupine'}:
+            if self.wakeword_backend in {'pvp', 'pvporcupine'}:
 
-        #         try:
-        #             self.porcupine = pvporcupine.create(
-        #                 keywords=self.wake_words_list,
-        #                 sensitivities=self.wake_words_sensitivities
-        #             )
-        #             self.buffer_size = self.porcupine.frame_length
-        #             self.sample_rate = self.porcupine.sample_rate
+                try:
+                    self.porcupine = pvporcupine.create(
+                        keywords=self.wake_words_list,
+                        sensitivities=self.wake_words_sensitivities
+                    )
+                    self.buffer_size = self.porcupine.frame_length
+                    self.sample_rate = self.porcupine.sample_rate
 
-        #         except Exception as e:
-        #             logger.exception(
-        #                 "Error initializing porcupine "
-        #                 f"wake word detection engine: {e}"
-        #             )
-        #             raise
+                except Exception as e:
+                    logger.exception(
+                        "Error initializing porcupine "
+                        f"wake word detection engine: {e}"
+                    )
+                    raise
 
-        #         logger.debug(
-        #             "Porcupine wake word detection engine initialized successfully"
-        #         )
+                logger.debug(
+                    "Porcupine wake word detection engine initialized successfully"
+                )
 
-        #     elif self.wakeword_backend in {'oww', 'openwakeword', 'openwakewords'}:
+            elif self.wakeword_backend in {'oww', 'openwakeword', 'openwakewords'}:
                     
-        #         openwakeword.utils.download_models()
+                openwakeword.utils.download_models()
 
-        #         try:
-        #             if openwakeword_model_paths:
-        #                 model_paths = openwakeword_model_paths.split(',')
-        #                 self.owwModel = Model(
-        #                     wakeword_models=model_paths,
-        #                     inference_framework=openwakeword_inference_framework
-        #                 )
-        #                 logger.info(
-        #                     "Successfully loaded wakeword model(s): "
-        #                     f"{openwakeword_model_paths}"
-        #                 )
-        #             else:
-        #                 self.owwModel = Model(
-        #                     inference_framework=openwakeword_inference_framework)
+                try:
+                    if openwakeword_model_paths:
+                        model_paths = openwakeword_model_paths.split(',')
+                        self.owwModel = Model(
+                            wakeword_models=model_paths,
+                            inference_framework=openwakeword_inference_framework
+                        )
+                        logger.info(
+                            "Successfully loaded wakeword model(s): "
+                            f"{openwakeword_model_paths}"
+                        )
+                    else:
+                        self.owwModel = Model(
+                            inference_framework=openwakeword_inference_framework)
                     
-        #             self.oww_n_models = len(self.owwModel.models.keys())
-        #             if not self.oww_n_models:
-        #                 logger.error(
-        #                     "No wake word models loaded."
-        #                 )
+                    self.oww_n_models = len(self.owwModel.models.keys())
+                    if not self.oww_n_models:
+                        logger.error(
+                            "No wake word models loaded."
+                        )
 
-        #             for model_key in self.owwModel.models.keys():
-        #                 logger.info(
-        #                     "Successfully loaded openwakeword model: "
-        #                     f"{model_key}"
-        #                 )
+                    for model_key in self.owwModel.models.keys():
+                        logger.info(
+                            "Successfully loaded openwakeword model: "
+                            f"{model_key}"
+                        )
 
-        #         except Exception as e:
-        #             logger.exception(
-        #                 "Error initializing openwakeword "
-        #                 f"wake word detection engine: {e}"
-        #             )
-        #             raise
+                except Exception as e:
+                    logger.exception(
+                        "Error initializing openwakeword "
+                        f"wake word detection engine: {e}"
+                    )
+                    raise
 
-        #         logger.debug(
-        #             "Open wake word detection engine initialized successfully"
-        #         )
+                logger.debug(
+                    "Open wake word detection engine initialized successfully"
+                )
             
-        #     else:
-        #         logger.exception(f"Wakeword engine {self.wakeword_backend} unknown/unsupported. Please specify one of: pvporcupine, openwakeword.")
+            else:
+                logger.exception(f"Wakeword engine {self.wakeword_backend} unknown/unsupported. Please specify one of: pvporcupine, openwakeword.")
 
 
         # Setup voice activity detection model WebRTC

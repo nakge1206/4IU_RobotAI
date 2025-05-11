@@ -1,4 +1,7 @@
 # tts_module.py
+import os
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"  # OpenMP 중복 방지 설정
+
 import socket
 import threading
 import time
