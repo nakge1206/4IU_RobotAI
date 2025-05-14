@@ -54,7 +54,7 @@ class ConversationService:
 
         except Exception as e:
             print(" LLM 처리 중 오류 발생:", str(e))
-            self.tts.send_text("응~ 무슨 말인지 잘 모르겠어!")
+            self.tts.send_text("응~ 무슨 말인지 잘 모르겠어 !")
 
         gc.collect()
         torch.cuda.empty_cache()
