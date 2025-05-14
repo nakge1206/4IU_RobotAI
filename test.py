@@ -24,33 +24,40 @@ class ConversationService:
         self.llm = LLMResponder()
 
     def start(self):
-        print("\n시스템 실행 중...")
-        # self.tts.connect()
+        print("\n 시스템 실행 중...")
         self.stt.start()
+        self.tts.connect()  # 실제 사용 시 주석 해제
 
     def handle_stt(self, text_tuple):
         self.is_tts_running = True
         if self.is_tts_running:
             self.stt.pause()
 
-        print(f"\nstt 결과: {text_tuple}")
+        print(f"\n STT 결과: {text_tuple}")
 
-        stt_text, metadata = text_tuple
-        emotion = metadata.get("emotion", "")
-        event = metadata.get("event", "")
-        
-        response = self.llm.generate_response(
-            stt_text,
-            emotion=emotion,
-            event=event,
-            mbti="INFP"
-        )
+        try:
+            stt_text, metadata = text_tuple
+            emotion = metadata.get("emotion", "")
+            event = metadata.get("event", "")
+
+            print(f" LLM 추론 진입 → 텍스트: '{stt_text}', 감정: '{emotion}', 이벤트: '{event}'")
+
+            response = self.llm.generate_response(
+                stt_text,
+                emotion=emotion,
+                event=event,
+                mbti="INFP"
+            )
+
+            print(f" LLM 결과: {response}")
+            self.tts.send_text(response)
+
+        except Exception as e:
+            print(" LLM 처리 중 오류 발생:", str(e))
+            self.tts.send_text("응~ 무슨 말인지 잘 모르겠어!")
 
         gc.collect()
         torch.cuda.empty_cache()
-
-        print(f"\nllm 결과: {response}")
-        self.tts.send_text(response)  # TTS 연동 시
 
     def resume_stt(self):
         self.is_tts_running = False
@@ -65,4 +72,4 @@ if __name__ == "__main__":
         while True:
             pass
     except KeyboardInterrupt:
-        print("\n종료 중...")
+        print("\n 종료 중...")

@@ -1,31 +1,30 @@
 import os
-os.environ['KMP_DUPLICATE_LIB_OK']='True'
 import re
+import gc
+import time
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel, PeftConfig
-import time
+
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 
 class LLMResponder:
     def __init__(self, model_path="Bllossom/llama-3.2-Korean-Bllossom-3B", adapter_path=None):
-        # 1. 어댑터 경로 수동 설정 (지정된 절대 경로 사용)
         if adapter_path is None:
-            adapter_path = "robot_core/gsq_lora_adapter"  # ✅ 윈도우 절대 경로 문자열
+            adapter_path = "robot_core/gsq_lora_adapter"
 
-        # 2. 토크나이저 로드
+        # 토크나이저 로드
         self.tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False)
         self.tokenizer.pad_token = self.tokenizer.eos_token
         self.tokenizer.chat_template = None
 
-        # 3. 베이스 모델 로드
+        # 모델 및 어댑터 로드
         base_model = AutoModelForCausalLM.from_pretrained(
             model_path,
             torch_dtype=torch.float16,
             device_map="auto"
         )
-
-        # 4. LoRA 어댑터 로드 (문자열 경로)
         peft_config = PeftConfig.from_pretrained(adapter_path, local_files_only=True)
         self.model = PeftModel.from_pretrained(
             model=base_model,
@@ -49,29 +48,45 @@ MBTI: {mbti}
 
 ### 로봇 (유아 역할)
 """
-        inputs = self.tokenizer(prompt, return_tensors="pt").to("cuda")
 
-        with torch.no_grad():
-            outputs = self.model.generate(
-                **inputs,
-                max_new_tokens=40,  # 생성할 최대 토큰 수
-                do_sample=True, # 샘플링 여부(True: 확률기반, False: greedy)
-                temperature=0.6,    # 샘플링 다양성(클수록 창의적, defualt = 1)
-                top_k=30,   # 고려할 토큰 후보 수
-                top_p=0.85,     # 누적 확률이 p 이하인 후보만 선택
-                repetition_penalty=1.2,     # 반복 단어 억제 계수
-                no_repeat_ngram_size=2,     # 같은 2-gram(단어 2개 조합) 반복 금지
-                eos_token_id=self.tokenizer.eos_token_id    # 종료 토큰
+        try:
+            inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
+
+            with torch.no_grad():
+                outputs = self.model.generate(
+                    **inputs,
+                    max_new_tokens=40,
+                    do_sample=True,
+                    temperature=0.6,
+                    top_k=30,
+                    top_p=0.85,
+                    repetition_penalty=1.2,
+                    no_repeat_ngram_size=2,
+                    eos_token_id=self.tokenizer.eos_token_id,
+                    pad_token_id=self.tokenizer.pad_token_id,
+                )
+
+            decoded = self.tokenizer.decode(
+                outputs[0].cpu(),
+                skip_special_tokens=True,
+                clean_up_tokenization_spaces=True
             )
+            response = decoded.split("### 로봇 (유아 역할)\n")[-1].strip().split("###")[0].strip()
 
-        decoded = self.tokenizer.decode(
-            outputs[0].cpu(),
-            skip_special_tokens=True,
-            clean_up_tokenization_spaces=True
-        )
-        response = decoded.split("### 로봇 (유아 역할)\n")[-1].strip().split("###")[0].strip()
+        except Exception as e:
+            print(" LLM 처리 오류:", str(e))
+            response = "응~ 무슨 말인지 잘 모르겠어!"
+            outputs = None
+
         response_clean = re.sub(r"[^\uAC00-\uD7A3a-zA-Z0-9\s.,?!~]", "", response)
-        
+
+        # GPU 메모리 정리
+        del inputs
+        if outputs is not None:
+            del outputs
+        torch.cuda.empty_cache()
+        gc.collect()
+
         elapsed = time.time() - start_time
-        print("대답 완성. 소요시간 : ", elapsed)
+        print(" 대답 완성. 소요시간:", round(elapsed, 2), "초")
         return response_clean
