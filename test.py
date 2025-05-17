@@ -10,7 +10,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'realtime_opensource'))
 sys.path.append(os.path.join(os.path.dirname(__file__), 'robot_core'))
 
 # STT/LLM 모듈 임포트
-from realtime_opensource.realtime_stt_module import STTWrapper
+from realtime_opensource.realtime_stt_module import STTModule
 from realtime_opensource.realtime_tts_module import TTSClient  # TTS 연동 시 사용
 from robot_core.llm_inference import LLMResponder
 
@@ -20,7 +20,7 @@ class ConversationService:
         self.results = []
         self.is_tts_running = False
         self.tts = TTSClient(on_done=self.resume_stt)  # TTS 사용 시
-        self.stt = STTWrapper(on_text_callback=self.handle_stt)
+        self.stt = STTModule(on_text_callback=self.handle_stt)
         self.llm = LLMResponder()
 
     def start(self):
@@ -29,6 +29,7 @@ class ConversationService:
         self.tts.connect()  # 실제 사용 시 주석 해제
 
     def handle_stt(self, text_tuple):
+        """STTModule에서 text가 생성될 때 마다 이 코드가 실행됨."""
         self.is_tts_running = True
         if self.is_tts_running:
             self.stt.pause()

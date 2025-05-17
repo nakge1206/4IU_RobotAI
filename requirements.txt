@@ -23,4 +23,4 @@ matplotlib
 realtimetts[all]
 ffmpeg
 charset_normalizer
-cv2
+opencv-python
