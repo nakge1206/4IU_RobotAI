@@ -57,9 +57,9 @@ MBTI: {mbti}
                     **inputs,
                     max_new_tokens=40,
                     do_sample=True,
-                    temperature=0.6,
+                    temperature=0.6, #0.8?
                     top_k=30,
-                    top_p=0.85,
+                    top_p=0.85, #0.9?
                     repetition_penalty=1.2,
                     no_repeat_ngram_size=2,
                     eos_token_id=self.tokenizer.eos_token_id,

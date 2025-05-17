@@ -1,3 +1,5 @@
+import os
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"  # OpenMP 중복 방지 설정
 import cv2
 from time import time
 from ROD_detection import RealtimeObjectDetection
