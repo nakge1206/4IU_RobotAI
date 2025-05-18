@@ -16,6 +16,9 @@ from realtime_opensource.realtime_stt_module import STTModule
 from realtime_opensource.realtime_tts_module import TTSClient  # TTS 연동 시 사용
 from robot_core.llm_inference import LLMResponder
 from vision.ROD_module import YoloModule
+from robot_core.gpt_fine_tuning_model import FineTunedGPTClient 
+
+
 
 
 class Yomi:
@@ -24,7 +27,9 @@ class Yomi:
         self.is_tts_running = False
         self.stt = STTModule(on_text_callback=self.handle_stt) if isSTT else None
         self.tts = TTSClient(on_done=self.resume_stt) if isTTS else None  # TTS 사용 시
-        self.llm = LLMResponder() if isLLM else None
+
+        # self.llm = LLMResponder() if isLLM else None
+        self.llm = FineTunedGPTClient() if isLLM else None
         self.yolo = YoloModule(interval=2, on_vision_callback=self.handle_vision, viewGUI=True) if isVision else None
 
     def start(self):
@@ -60,17 +65,27 @@ class Yomi:
 
                 print(f" LLM 추론 진입 → 텍스트: '{stt_text}', 감정: '{emotion}', 이벤트: '{event}'")
 
+
                 if self.llm:
-                    response = self.llm.generate_response(
-                        stt_text,
-                        emotion=emotion,
-                        event=event,
-                        mbti="INFP"
-                    )
-                    print(f" LLM 결과: {response}")
-                    if self.tts:
-                        print("llm(true), tts(true)")
-                        self.tts.send_text(response)
+                    # gsq 모델
+                # response = self.llm.generate_response(
+                    #     stt_text,
+                    #     emotion=emotion,
+                    #     event=event,
+                    #     mbti="INFP"
+                    # )
+        
+                # gpt 모델
+                    user_prompt = self.llm.build_instruction(stt_text, emotion, event)
+                    response = self.llm.chat(user_prompt)
+
+                #######################################
+                print(f" LLM 결과: {response}")
+                if self.tts:
+                    print("llm(true), tts(true)")
+                    self.tts.send_text(response)
+
+
                 else:
                     if self.tts:
                         print("llm(false), tts(true)")
@@ -93,7 +108,8 @@ class Yomi:
         pass
 
 if __name__ == "__main__":
-    service = Yomi(isSTT=True, isLLM=False, isTTS=True, isVision=True)
+    service = Yomi(isSTT=True, isLLM=True, isTTS=True, isVision=True)
+
     service.start()
 
     try:
