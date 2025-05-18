@@ -23,17 +23,17 @@ Author: Kolja Beigel
 # import faster_whisper
 
 from typing import Iterable, List, Optional, Union
-# from openwakeword.model import Model
+from openwakeword.model import Model
 import torch.multiprocessing as mp
 from scipy.signal import resample
 import signal as system_signal
 from ctypes import c_bool
 from scipy import signal
-# import soundfile as sf
-# import openwakeword
+import soundfile as sf
+import openwakeword
 import collections
 import numpy as np
-# import pvporcupine
+import pvporcupine
 import traceback
 import threading
 import webrtcvad

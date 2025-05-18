@@ -13,7 +13,7 @@ from transformers import (
     DataCollatorForLanguageModeling
 )
 from peft import get_peft_model, LoraConfig, TaskType
-from dotenv import load_dotenv  # ✅ .env 파일에서 환경변수 불러오기
+from dotenv import load_dotenv  #  .env 파일에서 환경변수 불러오기
 
 #  1. 환경변수 설정
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
