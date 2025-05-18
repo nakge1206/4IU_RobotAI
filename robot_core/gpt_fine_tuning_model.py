@@ -16,9 +16,15 @@ class FineTunedGPTClient:
             "너무 어렵게 말하지 말고, 귀엽고 자연스럽게 이야기해."
         )
 
-    def build_instruction(self, stt_text: str, emotion: str, event: str) -> str:
+    def build_instruction(self, stt_text: str, emotion: str, event: str, vision:str=None) -> str:
         stt_text = stt_text.strip()
-        return f"{stt_text}... 감정은 '{emotion}'이고 상황은 '{event}'이야."
+        if vision:
+            return f"청각정보는{stt_text}이고, 감정은 '{emotion}', 상황은 '{event}'이야. \n 시각정보는 {vision}이야."
+        else:
+            return f"청각정보는 {stt_text}이고, 감정은 '{emotion}', 상황은 '{event}'이야."
+    
+    def build_instruction_vision(self, visionText):
+        return f"너의 시각에서 {visionText}가 인식되고 있어."
 
     def chat(self, user_input: str) -> str:
         try:
