@@ -10,7 +10,7 @@ class STTModule:
         self.recorder = AudioToTextRecorder(
             language="ko", 
             spinner = False, #마이크 입력 등에 대해 돌아가는 애니메이션 및 글자 출력 여부
-            silero_sensitivity = 0.5, #silero의 민감도. 0이 둔감, 1이 민감
+            silero_sensitivity = 0.8, #silero의 민감도. 0이 둔감, 1이 민감
             silero_use_onnx = True, # PyTorch대신 onnx로 사용. 아무튼 빠르다고 함.
             silero_deactivity_detection=True, # silero를 발화 종료 감지에 사용
             print_transcription_time=True, #지연율 출력
