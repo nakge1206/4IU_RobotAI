@@ -4,29 +4,45 @@ import sys
 import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"  # OpenMP 중복 방지 설정
 import torch, gc
+import threading
 
 # 모듈 경로 추가
 sys.path.append(os.path.join(os.path.dirname(__file__), 'realtime_opensource'))
 sys.path.append(os.path.join(os.path.dirname(__file__), 'robot_core'))
+sys.path.append(os.path.join(os.path.dirname(__file__), 'vision'))
 
-# STT/LLM 모듈 임포트
+# 각 모듈 임포트
 from realtime_opensource.realtime_stt_module import STTModule
 from realtime_opensource.realtime_tts_module import TTSClient  # TTS 연동 시 사용
 from robot_core.llm_inference import LLMResponder
+from vision.ROD_module import YoloModule
 
 
-class ConversationService:
-    def __init__(self):
+class Yomi:
+    def __init__(self, isSTT=True, isTTS=True, isLLM=True, isVision=True):
         self.results = []
         self.is_tts_running = False
-        self.tts = TTSClient(on_done=self.resume_stt)  # TTS 사용 시
-        self.stt = STTModule(on_text_callback=self.handle_stt)
-        self.llm = LLMResponder()
+        self.stt = STTModule(on_text_callback=self.handle_stt) if isSTT else None
+        self.tts = TTSClient(on_done=self.resume_stt) if isTTS else None  # TTS 사용 시
+        self.llm = LLMResponder() if isLLM else None
+        self.yolo = YoloModule(interval=2, on_vision_callback=self.handle_vision, viewGUI=True) if isVision else None
 
     def start(self):
         print("\n 시스템 실행 중...")
-        self.stt.start()
-        self.tts.connect()  # 실제 사용 시 주석 해제
+        if self.stt:
+            # self.stt.start()
+            threading.Thread(target=self.stt.start, daemon=True).start()
+        if self.tts:
+            pass
+            # self.tts.connect() 
+        if self.yolo:
+            self.yolo.run_detection()
+    
+    def stop(self):
+        self.stt.stop()
+        # self.llm.stop() # 이 기능 아직 없던데 모듈화 과정에서 추가해야함.
+        self.tts.stop()
+        self.yolo.stop()
 
     def handle_stt(self, text_tuple):
         """STTModule에서 text가 생성될 때 마다 이 코드가 실행됨."""
@@ -34,39 +50,50 @@ class ConversationService:
         if self.is_tts_running:
             self.stt.pause()
 
-        print(f"\n STT 결과: {text_tuple}")
+        if self.stt:
+            print(f"\n STT 결과: {text_tuple}")
 
-        try:
-            stt_text, metadata = text_tuple
-            emotion = metadata.get("emotion", "")
-            event = metadata.get("event", "")
+            try:
+                stt_text, metadata = text_tuple
+                emotion = metadata.get("emotion", "")
+                event = metadata.get("event", "")
 
-            print(f" LLM 추론 진입 → 텍스트: '{stt_text}', 감정: '{emotion}', 이벤트: '{event}'")
+                print(f" LLM 추론 진입 → 텍스트: '{stt_text}', 감정: '{emotion}', 이벤트: '{event}'")
 
-            response = self.llm.generate_response(
-                stt_text,
-                emotion=emotion,
-                event=event,
-                mbti="INFP"
-            )
+                if self.llm:
+                    response = self.llm.generate_response(
+                        stt_text,
+                        emotion=emotion,
+                        event=event,
+                        mbti="INFP"
+                    )
+                    print(f" LLM 결과: {response}")
+                    if self.tts:
+                        print("llm(true), tts(true)")
+                        self.tts.send_text(response)
+                else:
+                    if self.tts:
+                        print("llm(false), tts(true)")
+                        self.tts.send_text(stt_text)
 
-            print(f" LLM 결과: {response}")
-            self.tts.send_text(response)
-
-        except Exception as e:
-            print(" LLM 처리 중 오류 발생:", str(e))
-            self.tts.send_text("응~ 무슨 말인지 잘 모르겠어!")
-
-        gc.collect()
-        torch.cuda.empty_cache()
+            except Exception as e:
+                print(" LLM 처리 중 오류 발생:", str(e))
+                if self.tts:
+                    self.tts.send_text("응~ 무슨 말인지 잘 모르겠어!")
 
     def resume_stt(self):
         self.is_tts_running = False
-        self.stt.resume()
+        if self.stt:
+            self.stt.resume()
 
+    def handle_vision(self, visionText):
+        print(visionText)
+
+    def llm_promt(self):
+        pass
 
 if __name__ == "__main__":
-    service = ConversationService()
+    service = Yomi(isSTT=True, isLLM=False, isTTS=True, isVision=True)
     service.start()
 
     try:
@@ -74,3 +101,4 @@ if __name__ == "__main__":
             pass
     except KeyboardInterrupt:
         print("\n 종료 중...")
+        Yomi.stop()

@@ -20,3 +20,7 @@ gsq_finetuned_model/
 gsq_lora_adapter/
 qwen_lora_adapter/
 qwen_lora_model/
+gsq_lora_adapter_blossom_backup
+
+#vision
+detections_log.json
