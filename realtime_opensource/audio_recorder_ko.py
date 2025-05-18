@@ -81,16 +81,19 @@ class TranscriptionWorker:
 
     # 파이프를 통해 데이터를 받아 queqe에 저장함
     def poll_connection(self):
-        while not self.shutdown_event.is_set(): #shutdown이 없을때만 반복
-            #0.01초(10ms) 마다 수집정보 확인
-            if self.conn.poll(0.01): 
-                try:
-                    data = self.conn.recv()
-                    self.queue.put(data)
-                except Exception as e:
-                    logging.error(f"데이터 수신 중 오류 발생: {e}", exc_info=True)
-            else:
-                time.sleep(0.01)
+        try:
+            while not self.shutdown_event.is_set(): #shutdown이 없을때만 반복    
+                #0.01초(10ms) 마다 수집정보 확인
+                if self.conn.poll(0.01): 
+                    try:
+                        data = self.conn.recv()
+                        self.queue.put(data)
+                    except Exception as e:
+                        logging.error(f"데이터 수신 중 오류 발생: {e}", exc_info=True)
+                else:
+                    time.sleep(0.01)
+        except OSError:
+            print("voice 파이프 관련 에러")
 
     def run(self):
         if __name__ == "__main__":

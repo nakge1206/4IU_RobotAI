@@ -17,7 +17,7 @@ class LLMResponder:
         # 토크나이저 로드
         self.tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False)
         self.tokenizer.pad_token = self.tokenizer.eos_token
-        self.tokenizer.chat_template = None
+        # self.tokenizer.chat_template = None
 
         # 모델 및 어댑터 로드
         base_model = AutoModelForCausalLM.from_pretrained(

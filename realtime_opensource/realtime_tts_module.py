@@ -89,8 +89,13 @@ class TTSClient:
         self.host = host
         self.port = port
         self.on_done = on_done
+        self.isRunning = True
 
     def send_text(self, text: str):
+        if not self.isRunning:
+            print("TTSClient 꺼져있음.")
+            return
+
         def _send():
             try:
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -107,6 +112,10 @@ class TTSClient:
                     self.on_done()
 
         threading.Thread(target=_send, daemon=True).start()
+    
+    def stop(self):
+        print("TTSClient 종료.")
+        self.active = False
 
 
 #  테스트 실행
