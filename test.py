@@ -19,12 +19,15 @@ from vision.ROD_module import YoloModule
 from robot_core.gpt_fine_tuning_model import FineTunedGPTClient 
 
 
+
+
 class Yomi:
     def __init__(self, isSTT=True, isTTS=True, isLLM=True, isVision=True):
         self.results = []
         self.is_tts_running = False
         self.stt = STTModule(on_text_callback=self.handle_stt) if isSTT else None
         self.tts = TTSClient(on_done=self.resume_stt) if isTTS else None  # TTS 사용 시
+
         # self.llm = LLMResponder() if isLLM else None
         self.llm = FineTunedGPTClient() if isLLM else None
         self.yolo = YoloModule(interval=2, on_vision_callback=self.handle_vision, viewGUI=True) if isVision else None
@@ -62,6 +65,7 @@ class Yomi:
 
                 print(f" LLM 추론 진입 → 텍스트: '{stt_text}', 감정: '{emotion}', 이벤트: '{event}'")
 
+
                 if self.llm:
                     # gsq 모델
                 # response = self.llm.generate_response(
@@ -80,6 +84,8 @@ class Yomi:
                 if self.tts:
                     print("llm(true), tts(true)")
                     self.tts.send_text(response)
+
+
                 else:
                     if self.tts:
                         print("llm(false), tts(true)")
@@ -103,6 +109,7 @@ class Yomi:
 
 if __name__ == "__main__":
     service = Yomi(isSTT=True, isLLM=True, isTTS=True, isVision=True)
+
     service.start()
 
     try:
