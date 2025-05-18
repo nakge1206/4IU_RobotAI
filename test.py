@@ -13,6 +13,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'robot_core'))
 from realtime_opensource.realtime_stt_module import STTWrapper
 from realtime_opensource.realtime_tts_module import TTSClient  # TTS 연동 시 사용
 from robot_core.llm_inference import LLMResponder
+from robot_core.gpt_fine_tuning_model import build_instruction, chat_with_finetuned_gpt 
 
 
 class ConversationService:
@@ -21,7 +22,7 @@ class ConversationService:
         self.is_tts_running = False
         self.tts = TTSClient(on_done=self.resume_stt)  # TTS 사용 시
         self.stt = STTWrapper(on_text_callback=self.handle_stt)
-        self.llm = LLMResponder()
+        # self.llm = LLMResponder()
 
     def start(self):
         print("\n시스템 실행 중...")
@@ -39,12 +40,19 @@ class ConversationService:
         emotion = metadata.get("emotion", "")
         event = metadata.get("event", "")
         
-        response = self.llm.generate_response(
-            stt_text,
-            emotion=emotion,
-            event=event,
-            mbti="INFP"
-        )
+        # gsq 파인튜닝
+        # response = self.llm.generate_response(
+        #     stt_text,
+        #     emotion=emotion,
+        #     event=event,
+        #     mbti="INFP"
+        # )
+        
+        # gpt 파인튜닝
+        user_prompt = build_instruction(stt_text, emotion, event)
+        response = chat_with_finetuned_gpt(user_prompt)
+
+        #######################################
 
         gc.collect()
         torch.cuda.empty_cache()
