@@ -5,6 +5,7 @@ import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"  # OpenMP 중복 방지 설정
 import threading
 import random
+import subprocess
 
 
 # 모듈 경로 추가
@@ -19,7 +20,7 @@ from robot_core.llm_inference import LLMResponder
 from vision.ROD_module import YoloModule
 from robot_core.gpt_fine_tuning_model import FineTunedGPTClient 
 
-
+subprocess.Popen(["python", "4IU_RobotAI\realtime_opensource\realtime_tts_module.py"])
 
 
 class Yomi:
@@ -95,16 +96,25 @@ class Yomi:
 
                 print(f" LLM 결과: {response}")
                 if self.tts:
-                    print("LLM->TTS")
-                    self.tts.send_text(response)
-            if not isSTT and isVision:
-                print("YOLO->LLM, 시각정보 : ", visionText)
-                user_prompt = self.llm.build_instruction_vision(visionText)
-                response = self.llm.chat(user_prompt)
-                print(f" LLM 결과: {response}")
-                if self.tts:
-                    print("LLM->TTS")
-                    self.tts.send_text(response)
+                    if not self.is_tts_running:
+                        self.is_tts_running = True  # 재생 중 플래그
+                        print("LLM->TTS")
+                        self.tts.send_text(response)
+                    else:
+                        print("TTS가 아직 끝나지 않았습니다. 새 요청 무시.")
+
+                elif not isSTT and isVision:
+                    print("YOLO->LLM, 시각정보 : ", visionText)
+                    user_prompt = self.llm.build_instruction_vision(visionText)
+                    response = self.llm.chat(user_prompt)
+                    print(f" LLM 결과: {response}")
+                    if self.tts:
+                        if not self.is_tts_running:
+                            self.is_tts_running = True
+                            print("LLM->TTS")
+                            self.tts.send_text(response)
+                        else:
+                            print("TTS가 재생 중입니다. Vision 응답 무시.")
         else: #llm 껐을때
             if self.tts: #근데 tts는 켜져있을 때
                 self.tts.send_text(stt_text)
