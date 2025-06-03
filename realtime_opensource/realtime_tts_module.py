@@ -1,44 +1,46 @@
-# tts_module.py
 import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 import socket
 import threading
-import time
 from queue import Queue
-from RealtimeTTS.engines import EdgeEngine
-from RealtimeTTS import TextToAudioStream
+from gtts import gTTS
+from pydub import AudioSegment
+import io
+import simpleaudio as sa
+
+
+def speak_gtts(text, lang="ko"):
+    """gTTS로 음성 생성 후 메모리 재생"""
+    try:
+        mp3_fp = io.BytesIO()
+        tts = gTTS(text=text, lang=lang)
+        tts.write_to_fp(mp3_fp)
+        mp3_fp.seek(0)
+
+        audio = AudioSegment.from_file(mp3_fp, format="mp3")
+        play_obj = sa.play_buffer(audio.raw_data,
+                                  num_channels=audio.channels,
+                                  bytes_per_sample=audio.sample_width,
+                                  sample_rate=audio.frame_rate)
+        play_obj.wait_done()
+    except Exception as e:
+        print(" [gTTS 재생 오류]:", e)
 
 
 class TTSHandler:
     """TTS 요청을 큐로 받아 순차적으로 처리하는 비동기 재생 핸들러"""
-    def __init__(self, voice="ko-KR-SoonBokNeural"):
-        self.engine = EdgeEngine()
-        self.engine.set_voice(voice)
-        self.stream = TextToAudioStream(self.engine)
-
+    def __init__(self, lang="ko"):
+        self.lang = lang
         self.queue = Queue()
         self.worker = threading.Thread(target=self._process_queue, daemon=True)
         self.worker.start()
-
-        self.warm_up()
-
-    def warm_up(self):
-        """초기 재생 지연 제거"""
-        self.stream.feed("...")
-        self.stream.play_async()
-        if self.stream.play_thread:
-            self.stream.play_thread.join(timeout=5)
 
     def _process_queue(self):
         while True:
             text, conn = self.queue.get()
             try:
-                self.stream.feed(text)
-                self.stream.play_async()
-                if self.stream.play_thread:
-                    self.stream.play_thread.join(timeout=10)
-                time.sleep(0.3)
+                speak_gtts(text, lang=self.lang)
                 conn.sendall(b"done")
             except Exception as e:
                 print(" TTS 처리 중 오류:", e)
@@ -67,14 +69,19 @@ class TTSServer:
                 conn.close()
                 return
             text = data.decode('utf-8').strip()
-            print(f" 받은 문장: {text}")
+            print(f"받은 문장: {text}")
             self.tts.enqueue(text, conn)
         except Exception as e:
             print(" 클라이언트 처리 오류:", e)
             conn.close()
 
+    def run_in_thread(self):
+        thread = threading.Thread(target=self.start, daemon=True)
+        thread.start()
+        print("TTS 스레드 서버 실행")
+
     def start(self):
-        print(" TTS 서버 실행 중 (대기 중...)")
+        print(" 💬 gTTS TTS 서버 실행 중 (대기 중...)")
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.bind((self.host, self.port))
             s.listen()
@@ -99,7 +106,7 @@ class TTSClient:
         def _send():
             try:
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                    s.settimeout(15)  # 안전하게 타임아웃
+                    s.settimeout(20)  # gTTS 요청 지연 고려
                     s.connect((self.host, self.port))
                     s.sendall(text.encode('utf-8'))
 
@@ -115,10 +122,4 @@ class TTSClient:
     
     def stop(self):
         print("TTSClient 종료.")
-        self.active = False
 
-
-#  테스트 실행
-if __name__ == "__main__":
-    server = TTSServer()
-    server.start()
