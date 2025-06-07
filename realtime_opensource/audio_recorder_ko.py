@@ -9,7 +9,6 @@ import soundfile as sf
 import openwakeword
 import collections
 import numpy as np
-import pvporcupine
 import traceback
 import threading
 import webrtcvad
@@ -109,7 +108,8 @@ class TranscriptionWorker:
                 # 아래 두줄은 finetuning을 통해 따로 가중치 학습시킨 모델 파일이 있는경우 사용됨.
                 # trust_remote_code=True,
                 # remote_code="./model.py", 
-                device=self.device
+                device=self.device,
+                disable_update=True
             )
         except Exception as e:
             logging.exception("SenseVoice 모델 초기화 오류")
@@ -592,28 +592,28 @@ class AudioToTextRecorder:
                 for _ in range(len(self.wake_words_list))
             ]
 
-            if self.wakeword_backend in {'pvp', 'pvporcupine'}:
+            # if self.wakeword_backend in {'pvp', 'pvporcupine'}:
 
-                try:
-                    self.porcupine = pvporcupine.create(
-                        keywords=self.wake_words_list,
-                        sensitivities=self.wake_words_sensitivities
-                    )
-                    self.buffer_size = self.porcupine.frame_length
-                    self.sample_rate = self.porcupine.sample_rate
+            #     try:
+            #         self.porcupine = pvporcupine.create(
+            #             keywords=self.wake_words_list,
+            #             sensitivities=self.wake_words_sensitivities
+            #         )
+            #         self.buffer_size = self.porcupine.frame_length
+            #         self.sample_rate = self.porcupine.sample_rate
 
-                except Exception as e:
-                    logger.exception(
-                        "Error initializing porcupine "
-                        f"wake word detection engine: {e}"
-                    )
-                    raise
+            #     except Exception as e:
+            #         logger.exception(
+            #             "Error initializing porcupine "
+            #             f"wake word detection engine: {e}"
+            #         )
+            #         raise
 
-                logger.debug(
-                    "Porcupine wake word detection engine initialized successfully"
-                )
+            #     logger.debug(
+            #         "Porcupine wake word detection engine initialized successfully"
+            #     )
 
-            elif self.wakeword_backend in {'oww', 'openwakeword', 'openwakewords'}:
+            if self.wakeword_backend in {'oww', 'openwakeword', 'openwakewords'}:
                     
                 openwakeword.utils.download_models()
 
@@ -1619,6 +1619,7 @@ class AudioToTextRecorder:
         """
         Safely shuts down the audio recording by stopping the
         recording worker and closing the audio stream.
+        녹음 워커를 중지하고 오디오 스트림을 종료함으로써 오디오 녹음을 안전하게 종료합니다.
         """
 
         with self.shutdown_lock:

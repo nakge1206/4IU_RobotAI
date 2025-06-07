@@ -72,16 +72,15 @@ class TTSServer:
             print(f"받은 문장: {text}")
             self.tts.enqueue(text, conn)
         except Exception as e:
-            print(" 클라이언트 처리 오류:", e)
+            print("TTSServer : 클라이언트 처리 오류:", e)
             conn.close()
 
     def run_in_thread(self):
         thread = threading.Thread(target=self.start, daemon=True)
         thread.start()
-        print("TTS 스레드 서버 실행")
+        print("TTSServer : 준비완료")
 
     def start(self):
-        print(" 💬 gTTS TTS 서버 실행 중 (대기 중...)")
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.bind((self.host, self.port))
             s.listen()
@@ -100,7 +99,7 @@ class TTSClient:
 
     def send_text(self, text: str):
         if not self.isRunning:
-            print("TTSClient 꺼져있음.")
+            print("TTSClient : tts 꺼져있음.")
             return
 
         def _send():
