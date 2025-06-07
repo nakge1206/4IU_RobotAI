@@ -5,6 +5,7 @@ import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"  # OpenMP 중복 방지 설정
 import threading
 import random
+import time
 
 
 
@@ -29,6 +30,7 @@ class Yomi:
         self.lastVision = None
 
         self.stt = STTModule(on_text_callback=self.handle_stt) if isSTT else None
+        print("STT : 실행 준비 완료")
 
         self.tts_server = TTSServer()
         threading.Thread(target=self.tts_server.run_in_thread, daemon=True).start()
@@ -36,18 +38,20 @@ class Yomi:
         self.tts = TTSClient(on_done=self.resume_stt) if isTTS else None  # TTS 사용 시
         # self.llm = LLMResponder() if isLLM else None
         self.llm = FineTunedGPTClient() if isLLM else None
+        print("TTSClient : 실행 준비 완료")
 
-        self.vision = YoloModule(interval=2, on_vision_callback=self.handle_vision, viewGUI=True) if isVision else None
+        self.vision = YoloModule(interval=2, on_vision_callback=self.handle_vision, viewGUI=False) if isVision else None
+        print("Vision : 실행 준비 완료")
 
     def start(self):
-        print("\n 시스템 실행 중...")
+        print("yomi_core 시스템 준비중...")
         if self.stt:
             threading.Thread(target=self.stt.start, daemon=True).start()
         if self.tts:
             pass
             # self.tts.connect() 
         if self.vision:
-            self.vision.run_detection()
+            self.vision.start()
     
     def stop(self):
         if self.stt: 
@@ -65,7 +69,8 @@ class Yomi:
         self.is_tts_running = True
         if self.stt:
             self.stt.pause()
-
+            # pass
+        
         try:
             print(f"\n STT 결과: {stt_texts}")                
             labels = [item['label'] for item in self.lastVision] if self.lastVision else None
@@ -78,6 +83,7 @@ class Yomi:
         self.is_tts_running = False
         if self.stt:
             self.stt.resume()
+            # pass
 
     def handle_vision(self, visionText):
         self.lastVision = visionText
@@ -88,7 +94,8 @@ class Yomi:
     def llm_promt(self, sttTexts, visionText, isSTT=True, isVision=True):
         if not self.llm:
             if self.tts: #근데 tts는 켜져있을 때
-                self.tts.send_text(sttTexts[0])
+                if sttTexts:
+                    self.tts.send_text(sttTexts[0])
             return
 
 
@@ -132,12 +139,12 @@ class Yomi:
 
 
 if __name__ == "__main__":
-    service = Yomi(isSTT=True, isLLM=True, isTTS=True, isVision=True)
+    service = Yomi(isSTT=True, isLLM=False, isTTS=True, isVision=True)
     service.start()
 
     try:
         while True:
-            pass
+            time.sleep(0.1)
     except KeyboardInterrupt:
         print("\n 종료 중...")
         service.stop()
