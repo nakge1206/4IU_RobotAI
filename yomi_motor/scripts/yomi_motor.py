@@ -17,7 +17,8 @@ import time
 
 class MotionSequenceExecutor:
     def __init__(self):
-        rospy.init_node('yomi_motor', anonymous=True)
+        if not rospy.core.is_initialized():
+            rospy.init_node('yomi_motor', anonymous=True)
 
         #Subscriber
         rospy.Subscriber('/play_motion_sequence', String, self.handle_sequence_request)
