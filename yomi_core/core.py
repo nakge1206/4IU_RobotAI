@@ -12,16 +12,16 @@ from std_msgs.msg import String, Bool
 
 
 # 모듈 경로 추가
-sys.path.append(os.path.join(os.path.dirname(__file__), 'yomi_core/realtime_opensource'))
-sys.path.append(os.path.join(os.path.dirname(__file__), 'yomi_core/llm_core'))
-sys.path.append(os.path.join(os.path.dirname(__file__), 'yomi_core/vision'))
+sys.path.append(os.path.join(os.path.dirname(__file__), 'realtime_opensource'))
+sys.path.append(os.path.join(os.path.dirname(__file__), 'llm_core'))
+sys.path.append(os.path.join(os.path.dirname(__file__), 'vision'))
 
 # 각 모듈 임포트
-from yomi_core.realtime_opensource.realtime_stt_module import STTModule
-from yomi_core.realtime_opensource.realtime_tts_module import TTSClient, TTSServer  # TTS 연동 시 사용
+from realtime_opensource.realtime_stt_module import STTModule
+from realtime_opensource.realtime_tts_module import TTSClient, TTSServer  # TTS 연동 시 사용
 # from robot_core.inference_koalpaca_12B import LLMResponder
-from yomi_core.vision.ROD_module import YoloModule
-from yomi_core.llm_core.gpt_fine_tuning_model import FineTunedGPTClient 
+from vision.ROD_module import YoloModule
+from llm_core.gpt_fine_tuning_model import FineTunedGPTClient 
 
 
 
@@ -44,6 +44,7 @@ class Yomi:
         self.llm = FineTunedGPTClient() if isLLM else None # gpt 사용시
         self.vision = YoloModule(interval=2, on_vision_callback=self.handle_vision, viewGUI=True) if isVision else None
         self.lastVision = None
+        self.isVision = False
 
         #ros
         if not rospy.core.is_initialized():
@@ -58,6 +59,7 @@ class Yomi:
             pass
             # self.tts.connect() 
         if self.vision:
+            self.isVision = True
             self.vision.start()
         print("yomi_core 시스템 준비완료...")
 
@@ -71,7 +73,17 @@ class Yomi:
         if self.vision: 
             self.vision.stop()
         print("모든 모듈 종료")
+    
+    def pause(self):
+        if self.stt:
+            self.stt.pause()
+        self.isVision=False
 
+    def resume(self):
+        if self.stt and not self.is_tts_running:
+            self.stt.resume()
+        self.isVision=True
+    
     def handle_stt(self, stt_texts):
         """STTModule에서 text가 생성될 때 마다 이 코드가 실행됨"""
         self.is_tts_running = True
@@ -99,11 +111,12 @@ class Yomi:
 
     def handle_vision(self, visionText):
         """vision이 감지될때 마다 이 코드가 실행됨"""
-        self.lastVision = visionText
-        labels = [item['label'] for item in self.lastVision] if self.lastVision else None
-        print(labels)
-        if random.random() < 0.1:
-            self.llm_promt(None, labels, False, True)
+        if self.isVision:
+            self.lastVision = visionText
+            labels = [item['label'] for item in self.lastVision] if self.lastVision else None
+            print(labels)
+            if random.random() < 0.1:
+                self.llm_promt(None, labels, False, True)
 
     def llm_promt(self, sttTexts, visionText, isSTT=True, isVision=True):
         if not self.llm:
@@ -129,15 +142,19 @@ class Yomi:
             user_prompt = self.llm.build_instruction(stt_text, emotion, event, visionText)
 
             emotion, response = self.llm.chat(user_prompt)
+            print(f" LLM_emotion 결과: {emotion}")
             print(f" LLM 결과: {response}")
 
             if self.tts:
-                if not self.is_tts_running:
-                    self.is_tts_running = True  # 재생 중 플래그
-                    print("LLM->TTS")
-                    self.tts.send_text(response)
-                else:
-                    print("TTS가 아직 끝나지 않았습니다. 새 요청 무시.")
+                print("LLM->TTS")
+                self.tts.send_text(response)
+                self.llm_emotion.publish(emotion)
+                # if not self.is_tts_running:
+                #     self.is_tts_running = True  # 재생 중 플래그
+                #     print("LLM->TTS")
+                #     self.tts.send_text(response)
+                # else:
+                #     print("TTS가 아직 끝나지 않았습니다. 새 요청 무시.")
             return
         
         if not isSTT and isVision:
@@ -188,13 +205,13 @@ class Yomi:
             pass
 
 if __name__ == "__main__":
-    service = Yomi(isSTT=True, isLLM=False, isTTS=True, isVision=False)
+    service = Yomi(isSTT=True, isLLM=True, isTTS=True, isVision=False)
 
     service.start()
     # service.test_llm()
 
     try:
-        while True:
+        while not rospy.is_shutdown():
             time.sleep(0.1)
     except KeyboardInterrupt:
         print("\n 종료 중...")
