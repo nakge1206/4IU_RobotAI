@@ -78,7 +78,6 @@ class TTSServer:
     def run_in_thread(self):
         thread = threading.Thread(target=self.start, daemon=True)
         thread.start()
-        print("TTSServer : 준비완료")
 
     def start(self):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
