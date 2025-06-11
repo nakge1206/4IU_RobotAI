@@ -1,5 +1,3 @@
-# test.py
-
 import sys
 import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"  # OpenMP 중복 방지 설정
@@ -15,7 +13,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'vision'))
 # 각 모듈 임포트
 from realtime_opensource.realtime_stt_module import STTModule
 from realtime_opensource.realtime_tts_module import TTSClient  # TTS 연동 시 사용
-from robot_core.llm_inference import LLMResponder
+# from robot_core.inference_koalpaca_12B import LLMResponder
 from vision.ROD_module import YoloModule
 from robot_core.gpt_fine_tuning_model import FineTunedGPTClient 
 
@@ -29,7 +27,7 @@ class Yomi:
         self.stt = STTModule(on_text_callback=self.handle_stt) if isSTT else None
         self.tts = TTSClient(on_done=self.resume_stt) if isTTS else None  # TTS 사용 시
         # self.llm = LLMResponder() if isLLM else None
-        self.llm = FineTunedGPTClient() if isLLM else None
+        self.llm = FineTunedGPTClient() if isLLM else None # gpt 사용시
         self.vision = YoloModule(interval=2, on_vision_callback=self.handle_vision, viewGUI=True) if isVision else None
         self.lastVision = None
 
@@ -109,10 +107,39 @@ class Yomi:
             if self.tts: #근데 tts는 켜져있을 때
                 self.tts.send_text(stt_text)
 
+    def test_llm(self):
+        if self.llm:
+            # gsq 모델
+            # response = self.llm.generate_response(
+            #         stt_text,
+            #         emotion=emotion,
+            #         event=event,
+            #         mbti="INFP"
+            #     )
+            # gpt 모델
+            stt_text = "안녕. 밥 먹었어?"
+            emotion = "행복"
+            event = "말하는 중"
+            visionText = None
+
+            user_prompt = self.llm.build_instruction(stt_text, emotion, event)
+            response = self.llm.generate_response(
+                stt_text,
+                emotion=emotion,
+                event=event,
+                mbti="INFP"
+            )
+
+
+            print(f" LLM 결과: {response}")
+        else: #llm 껐을때
+            pass
+
 if __name__ == "__main__":
-    service = Yomi(isSTT=True, isLLM=True, isTTS=True, isVision=True)
+    service = Yomi(isSTT=False, isLLM=True, isTTS=False, isVision=False)
 
     service.start()
+    service.test_llm()
 
     try:
         while True:

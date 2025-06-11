@@ -1,5 +1,6 @@
 # logs
 realtimesst.log*
+runs/
 
 #.pyc
 __pycache__/
@@ -21,6 +22,8 @@ gsq_lora_adapter/
 qwen_lora_adapter/
 qwen_lora_model/
 gsq_lora_adapter_blossom_backup
+gsq_lora_adapter_koalpaca/
+gsq_lora_beomi7b_out/
 
 #vision
 detections_log.json
