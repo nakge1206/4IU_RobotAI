@@ -31,7 +31,9 @@ class Yomi:
         print("STT : 실행 준비 완료")
 
         self.tts_server = TTSServer()
+        print("TTSServer : 준비완료")
         threading.Thread(target=self.tts_server.run_in_thread, daemon=True).start()
+        print("TTSClient : 준비완료")
 
         self.tts = TTSClient(on_done=self.resume_stt) if isTTS else None  # TTS 사용 시
         # self.llm = LLMResponder() if isLLM else None
@@ -40,7 +42,6 @@ class Yomi:
         self.lastVision = None
 
     def start(self):
-        print("yomi_core 시스템 준비중...")
         if self.stt:
             threading.Thread(target=self.stt.start, daemon=True).start()
         if self.tts:
@@ -48,7 +49,8 @@ class Yomi:
             # self.tts.connect() 
         if self.vision:
             self.vision.start()
-    
+        print("yomi_core 시스템 준비완료...")
+
     def stop(self):
         if self.stt: 
             self.stt.stop()
@@ -84,6 +86,7 @@ class Yomi:
     def handle_vision(self, visionText):
         self.lastVision = visionText
         labels = [item['label'] for item in self.lastVision] if self.lastVision else None
+        print(labels)
         if random.random() < 0.1:
             self.llm_promt(None, labels, False, True)
 
@@ -163,14 +166,14 @@ class Yomi:
             pass
 
 if __name__ == "__main__":
-    service = Yomi(isSTT=False, isLLM=True, isTTS=False, isVision=False)
+    service = Yomi(isSTT=True, isLLM=False, isTTS=True, isVision=False)
 
     service.start()
-    service.test_llm()
+    # service.test_llm()
 
     try:
         while True:
             time.sleep(0.1)
     except KeyboardInterrupt:
         print("\n 종료 중...")
-        Yomi.stop()
+        service.stop()
