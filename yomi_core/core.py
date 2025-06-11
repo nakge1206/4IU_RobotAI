@@ -121,14 +121,16 @@ class Yomi:
             #         event=event,
             #         mbti="INFP"
             #     )
+
             # gpt 모델
             stt_text, metadata = sttTexts
             emotion = metadata.get("emotion", "")
             event = metadata.get("event", "")
             user_prompt = self.llm.build_instruction(stt_text, emotion, event, visionText)
-            response = self.llm.chat(user_prompt)
 
+            emotion, response = self.llm.chat(user_prompt)
             print(f" LLM 결과: {response}")
+
             if self.tts:
                 if not self.is_tts_running:
                     self.is_tts_running = True  # 재생 중 플래그
@@ -141,17 +143,21 @@ class Yomi:
         if not isSTT and isVision:
             print("YOLO->LLM, 시각정보 : ", visionText)
             user_prompt = self.llm.build_instruction_vision(visionText)
-            response = self.llm.chat(user_prompt)
+
+            emotion, response = self.llm.chat(user_prompt)
             print(f" LLM 결과: {response}")
+
             if self.tts:
                 if not self.is_tts_running:
                     self.is_tts_running = True
                     print("LLM->TTS")
                     self.tts.send_text(response)
+
         else: #llm 껐을때
             if self.tts: #근데 tts는 켜져있을 때
                 self.tts.send_text(stt_text)
 
+    
     def test_llm(self):
         if self.llm:
             # gsq 모델
@@ -161,6 +167,7 @@ class Yomi:
             #         event=event,
             #         mbti="INFP"
             #     )
+            
             # gpt 모델
             stt_text = "안녕. 밥 먹었어?"
             emotion = "행복"
