@@ -2,8 +2,8 @@ import os
 import cv2
 import threading
 import time
-from ROD_detection import RealtimeObjectDetection
-from ROD_log import DetectionLogger
+from .ROD_detection import RealtimeObjectDetection
+from .ROD_log import DetectionLogger
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"  # OpenMP 중복 방지
 

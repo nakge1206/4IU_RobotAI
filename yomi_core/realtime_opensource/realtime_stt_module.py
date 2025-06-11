@@ -2,7 +2,7 @@
 stt가 반환하는 result 값은
 (text, {"language", "emotion", "event", "itn"})
 '''
-from audio_recorder_ko import AudioToTextRecorder
+from .audio_recorder_ko import AudioToTextRecorder
 
 class STTModule:
     def __init__(self, on_text_callback):
