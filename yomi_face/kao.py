@@ -2,6 +2,7 @@ import os
 import threading
 import tkinter as tk
 from PIL import Image, ImageTk
+import queue
 
 class Yomi_face:
     def __init__(self):
@@ -11,8 +12,6 @@ class Yomi_face:
         self.img_index = 0
         self.tk_img = None
 
-        self.is_tts = False
-
         self.window = tk.Tk()
         self.window.attributes('-fullscreen', True)
 
@@ -21,6 +20,9 @@ class Yomi_face:
 
         self.label = tk.Label(self.window)
         self.label.pack()
+
+        self.command_queue = queue.Queue()
+        self._process_command_queue()
 
         self._bind_keys()
         self._start_input_thread()
@@ -34,6 +36,21 @@ class Yomi_face:
         """중지"""
         self.window.quit()
 
+    def _process_command_queue(self):
+        try:
+            while True:
+                cmd, args = self.command_queue.get_nowait()
+                if cmd == "toggle_emotion":
+                    self.toggle_emotion(*args)
+                elif cmd == "change_face":
+                    self.change_face(*args)
+                # 필요한 명령 추가
+        except queue.Empty:
+            pass
+
+        # 다음 호출 예약 (주기적 반복)
+        self.window.after(50, self._process_command_queue)
+
     def change_face(self, emotion):
         """input : emotion(angry, anticipation, disgust, fear, joy, sadness, surprise, trust)"""
         if emotion in self.image_paths:
@@ -42,11 +59,11 @@ class Yomi_face:
             self.show_emotion()
     
     def toggle_emotion(self, on_tts=False):
-        self.window.after(0, lambda: self._safe_toggle_emotion(on_tts))
-        # self.show_emotion(on_tts)
-    
-    def _safe_toggle_emotion(self, on_tts=False):
+        # self.window.after(0, lambda: self._safe_toggle_emotion(on_tts))
         self.show_emotion(on_tts)
+    
+    # def _safe_toggle_emotion(self, on_tts=False):
+    #     self.show_emotion(on_tts)
 
     def show_emotion(self, on_tts=None):
         """현재 감정에 따라 이미지를 번갈아 표시"""
@@ -59,7 +76,7 @@ class Yomi_face:
         
         # 1초 후에 다시 자신을 호출 (반복 깜빡임)
         if on_tts:
-            self.window.after(400, lambda: self.show_emotion(on_tts=True))
+            self.window.after(200, lambda: self.show_emotion(on_tts=True))
 
     def load_image(self, path):
         """이미지 불러온 후, Tk에 사용할 이미지로 변경"""

@@ -2,6 +2,7 @@
 
 import os
 import openai
+from typing import Tuple
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -67,7 +68,7 @@ class FineTunedGPTClient:
         return f"너의 시각에서 {visionText}가 인식되고 있어."
     
 
-    def chat(self, user_input: str) -> tuple[str, str]:
+    def chat(self, user_input: str) -> Tuple[str, str]:
         try:
             response = openai.chat.completions.create(
                 model=self.model_id,

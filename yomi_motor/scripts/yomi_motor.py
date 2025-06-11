@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import rospy
-from sensor_msgs.msg import Joy #joystick 값
 from std_msgs.msg import String, Int16MultiArray, Bool
 
 import json
@@ -28,7 +27,7 @@ class MotionSequenceExecutor:
         rospy.Subscriber('/switch_4_state', Bool, self.switch_callback, callback_args=4)
         rospy.Subscriber('/switch_5_state', Bool, self.switch_callback, callback_args=5)
         rospy.Subscriber('/switch_6_state', Bool, self.switch_callback, callback_args=6)
-        rospy.Subscriber('/joy', Joy, self.joy_callback)
+        
 
         #영상처리
         # rospy.Subscriber('/detected_object', String, self.handle_detected_object)
@@ -40,9 +39,6 @@ class MotionSequenceExecutor:
         
         #자율주행
         # self.goal_pub = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=10)
-
-        #Joystick
-        self.prev_buttons = [0] * 10 #Joystick의 버튼의 상태변화를 저장하기 위한 변수
         
 
         # # 객체 인식 -> 목표 위치 -> 특정 시퀀스 실행
@@ -55,24 +51,6 @@ class MotionSequenceExecutor:
 
         rospy.loginfo("✅ Main Core Node with Object Navigation Initialized")
         rospy.spin()
-
-    def joy_callback(self, msg):
-        """
-        f710버튼 pressed, released를 구분하는 joystick콜백함수
-        stick값 확장가능
-        """
-        for i in [3, 1]:  # Y (3), B (1)
-            if msg.buttons[i] == 1 and self.prev_buttons[i] == 0:
-                if i == 3:
-                    rospy.loginfo("Y pressed")
-                elif i == 1:
-                    rospy.loginfo("B pressed")
-            if msg.buttons[i] == 0 and self.prev_buttons[i] == 1:
-                if i == 3:
-                    rospy.loginfo("Y released")
-                elif i == 1:
-                    rospy.loginfo("B released")
-        self.prev_buttons = list(msg.buttons)
 
     def handle_sequence_request(self, msg):
         """동작 json파일을 읽어서 speed, position, servo, time값을 excute_sequence로 전송"""
