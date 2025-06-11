@@ -1,0 +1,10 @@
+yomi(
+    STT:True,
+    LLM: True,
+    Vison: True,
+    TTS: True,
+    Wheel: True,
+    Motion: True,
+    Face: True,
+    MBTI: "INFP" #or ESTJ
+).start()
