@@ -43,10 +43,14 @@ class FineTunedGPTClient:
             return "기쁨" # defult value
 
     def extract_emotion(self, response: str) -> str:
-        emotion = response.split("/")[0].strip()
-        if not emotion:
-            return "기쁨"  # 감정이 없을 경우 기본값 반환
-        return emotion
+        base_emotions = ["기쁨", "슬픔", "분노", "공포", "놀라움", "혐오", "신뢰", "기대"]
+        prefix = response.split("/")[0].strip()
+
+        for emo in base_emotions:
+            if emo in prefix:
+                return emo
+            
+        return "기쁨"
 
 
     def build_instruction(self, stt_text: str, emotion: str, event: str, vision:str=None) -> str:
@@ -63,7 +67,7 @@ class FineTunedGPTClient:
         return f"너의 시각에서 {visionText}가 인식되고 있어."
     
 
-    def chat(self, user_input: str) -> str:
+    def chat(self, user_input: str) -> tuple[str, str]:
         try:
             response = openai.chat.completions.create(
                 model=self.model_id,
@@ -73,27 +77,21 @@ class FineTunedGPTClient:
                 ],
                 max_tokens=150
             )
-            response_text =  response.choices[0].message.content.strip()
-
+            response_text = response.choices[0].message.content.strip()
             emotion = self.extract_emotion(response_text)
-            print(f"GPT가 출력한 감정: {emotion}")
-            return response_text
-        
+            return emotion, response_text 
+
         except Exception as e:
-            return f"(GPT 오류: {str(e)})"
+            return "오류", f"(GPT 오류: {str(e)})"
+
 
 
 if __name__ == "__main__":
-        
-    while(True):    
-        # FineTunedGPTClient 객체 생성
+
         gpt_client = FineTunedGPTClient(model_id="ft:gpt-4o-2024-08-06:personal::BYBJcaH7")
-        
-        # 사용자 입력 예시
-        user_input = input("사용자 입력을 입력하세요: ")  # 사용자로부터 입력을 받는 코드
-
-        # 실행: GPT 모델에서 반환된 응답을 출력
-        response = gpt_client.chat(user_input)
-        print(f"{response}")
-
-
+                
+        while(True):    
+            user_input = input("사용자 입력을 입력하세요: ")  
+            emotion, response = gpt_client.chat(user_input)
+            print(f"{emotion}")
+            print(f"{response}")
