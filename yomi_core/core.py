@@ -188,7 +188,7 @@ class Yomi:
             pass
 
 if __name__ == "__main__":
-    service = Yomi(isSTT=True, isLLM=False, isTTS=True, isVision=False)
+    service = Yomi(isSTT=True, isLLM=True, isTTS=True, isVision=False)
 
     service.start()
     # service.test_llm()
