@@ -90,10 +90,11 @@ class TTSServer:
 
 class TTSClient:
     """외부 모듈에서 호출하는 클라이언트"""
-    def __init__(self, host='127.0.0.1', port=65432, on_done=None):
+    def __init__(self, host='127.0.0.1', port=65432, on_done=None, on_start=None):
         self.host = host
         self.port = port
         self.on_done = on_done
+        self.on_start = on_start
         self.isRunning = True
 
     def send_text(self, text: str):
@@ -103,6 +104,9 @@ class TTSClient:
 
         def _send():
             try:
+                if self.on_start:
+                    self.on_start()
+                
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                     s.settimeout(20)  # gTTS 요청 지연 고려
                     s.connect((self.host, self.port))

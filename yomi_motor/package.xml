@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>yomi</name>
-  <version>0.0.0</version>
-  <description>The yomi package</description>
+  <name>yomi_motor</name>
+  <version>0.0.1</version>
+  <description>The yomi_motor_control package</description>
 
   <!-- One maintainer tag required, multiple allowed, one person per tag -->
   <!-- Example:  -->
