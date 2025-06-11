@@ -8,16 +8,16 @@ import time
 
 
 # 모듈 경로 추가
-sys.path.append(os.path.join(os.path.dirname(__file__), 'realtime_opensource'))
-sys.path.append(os.path.join(os.path.dirname(__file__), 'robot_core'))
-sys.path.append(os.path.join(os.path.dirname(__file__), 'vision'))
+sys.path.append(os.path.join(os.path.dirname(__file__), 'yomi_core/realtime_opensource'))
+sys.path.append(os.path.join(os.path.dirname(__file__), 'yomi_core/llm_core'))
+sys.path.append(os.path.join(os.path.dirname(__file__), 'yomi_core/vision'))
 
 # 각 모듈 임포트
-from realtime_opensource.realtime_stt_module import STTModule
-from realtime_opensource.realtime_tts_module import TTSClient  # TTS 연동 시 사용
+from yomi_core.realtime_opensource.realtime_stt_module import STTModule
+from yomi_core.realtime_opensource.realtime_tts_module import TTSClient, TTSServer  # TTS 연동 시 사용
 # from robot_core.inference_koalpaca_12B import LLMResponder
-from vision.ROD_module import YoloModule
-from robot_core.gpt_fine_tuning_model import FineTunedGPTClient 
+from yomi_core.vision.ROD_module import YoloModule
+from yomi_core.llm_core.gpt_fine_tuning_model import FineTunedGPTClient 
 
 
 
