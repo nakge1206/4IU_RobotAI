@@ -54,7 +54,8 @@ class Yomi:
 
     def start(self):
         if self.stt:
-            threading.Thread(target=self.stt.start, daemon=True).start()
+            self.stt.start()
+            # threading.Thread(target=self.stt.start, daemon=True).start()
         if self.tts:
             pass
             # self.tts.connect() 
@@ -87,8 +88,7 @@ class Yomi:
     def handle_stt(self, stt_texts):
         """STTModule에서 text가 생성될 때 마다 이 코드가 실행됨"""
         self.is_tts_running = True
-        if self.stt:
-            self.stt.pause()        
+        self.pause()      
         try:
             print(f"\n STT 결과: {stt_texts}")                
             labels = [item['label'] for item in self.lastVision] if self.lastVision else None
@@ -105,9 +105,7 @@ class Yomi:
         """TTS가 끝날때 마다 이 코드가 실행됨"""
         self.tts_state.publish(False)
         self.is_tts_running = False
-        if self.stt:
-            self.stt.resume()
-            # pass
+        self.resume()
 
     def handle_vision(self, visionText):
         """vision이 감지될때 마다 이 코드가 실행됨"""
@@ -144,6 +142,7 @@ class Yomi:
             emotion, response = self.llm.chat(user_prompt)
             print(f" LLM_emotion 결과: {emotion}")
             print(f" LLM 결과: {response}")
+            self.llm_emotion.publish(emotion)
 
             if self.tts:
                 print("LLM->TTS")
