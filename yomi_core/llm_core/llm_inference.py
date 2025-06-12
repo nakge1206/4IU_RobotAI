@@ -15,7 +15,7 @@ class LLMResponder:
             adapter_path = "gsq_lora_adapter"
 
         # 토크나이저 로드
-        self.tokenizer = AutoTokenizer.from_pretrained("beomi_tokenizer", use_fast=True)
+        self.tokenizer = AutoTokenizer.from_pretrained("/home/micca/catkin_ws/src/4IU_RobotAI/yomi_core/llm_core/beomi_tokenizer", use_fast=True)
         self.tokenizer.pad_token = self.tokenizer.eos_token
         # self.tokenizer.chat_template = None
 
@@ -55,11 +55,11 @@ MBTI: {mbti}
             with torch.no_grad():
                 outputs = self.model.generate(
                     **inputs,
-                    max_new_tokens=40,
+                    max_new_tokens=20,
                     do_sample=True,
-                    temperature=0.6, #0.8?
-                    top_k=30,
-                    top_p=0.85, #0.9?
+                    temperature=0.7, #0.8?
+                    top_k=20,
+                    top_p=0.8, #0.9?
                     repetition_penalty=1.2,
                     no_repeat_ngram_size=2,
                     eos_token_id=self.tokenizer.eos_token_id,
@@ -90,3 +90,24 @@ MBTI: {mbti}
         elapsed = time.time() - start_time
         print(" 대답 완성. 소요시간:", round(elapsed, 2), "초")
         return response_clean
+    
+
+if __name__ == "__main__":
+    # 모델 초기화
+    responder = LLMResponder(
+        model_path="beomi/llama-2-ko-7b",  # 사전 훈련된 LLaMA2 모델 경로
+        adapter_path="gsq_lora_adapter"   # LoRA 어댑터 경로
+    )
+
+    # 예제 입력
+    stt_text = "오늘 날씨가 너무 더워"
+    emotion = "짜증"
+    event = "밖에서 놀다가 더워서 짜증났어"
+    mbti = "INFP"
+
+    # 응답 생성
+    response = responder.generate_response(stt_text, emotion, event, mbti)
+
+    # 출력
+    print("\n💬 로봇 응답:", response)
+   

@@ -41,7 +41,7 @@ class FineTunedGPTClient:
         for key, values in emotion_wheel.items():
             if any(value in emotion_input for value in values):
                     return key
-            return "기쁨" # defult value
+            return "기대" # defult value
 
     def extract_emotion(self, response: str) -> str:
         base_emotions = ["기쁨", "슬픔", "분노", "공포", "놀라움", "혐오", "신뢰", "기대"]
@@ -51,7 +51,7 @@ class FineTunedGPTClient:
             if emo in prefix:
                 return emo
             
-        return "기쁨"
+        return "기대"
 
 
     def build_instruction(self, stt_text: str, emotion: str, event: str, vision:str=None) -> str:
