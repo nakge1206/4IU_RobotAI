@@ -28,7 +28,7 @@ class Yomi_face:
     def start(self):
         """시작"""
         self.show_emotion()
-        self.window.mainloop()
+        # self.window.mainloop()
     
     def stop(self):
         """중지"""
