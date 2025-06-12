@@ -31,6 +31,9 @@ class Yomi:
         self.is_tts_running = False
         self.lastVision = None
 
+        #어쩔마스터플래그
+        self.master_flag = True
+
         self.stt = STTModule(on_text_callback=self.handle_stt) if isSTT else None
         print("STT : 실행 준비 완료")
 
@@ -55,7 +58,6 @@ class Yomi:
     def start(self):
         if self.stt:
             self.stt.start()
-            # threading.Thread(target=self.stt.start, daemon=True).start()
         if self.tts:
             pass
             # self.tts.connect() 
@@ -81,9 +83,11 @@ class Yomi:
         self.isVision=False
 
     def resume(self):
-        if self.stt and not self.is_tts_running:
-            self.stt.resume()
-        self.isVision=True
+        #마스터 플래그가 true야 돌아가도록
+        if self.master_flag:
+            if self.stt and not self.is_tts_running:
+                self.stt.resume()
+            self.isVision=True
     
     def handle_stt(self, stt_texts):
         """STTModule에서 text가 생성될 때 마다 이 코드가 실행됨"""
@@ -105,16 +109,20 @@ class Yomi:
         """TTS가 끝날때 마다 이 코드가 실행됨"""
         self.tts_state.publish(False)
         self.is_tts_running = False
-        self.resume()
+        if not self.master_flag:
+            threading.Timer(2.0, self.done_tts).start()
+        else:
+            self.resume()
 
     def handle_vision(self, visionText):
         """vision이 감지될때 마다 이 코드가 실행됨"""
-        if self.isVision:
-            self.lastVision = visionText
-            labels = [item['label'] for item in self.lastVision] if self.lastVision else None
-            print(labels)
-            if random.random() < 0.1:
-                self.llm_promt(None, labels, False, True)
+        if self.master_flag:
+            if self.isVision:
+                self.lastVision = visionText
+                labels = [item['label'] for item in self.lastVision] if self.lastVision else None
+                print(labels)
+                if random.random() < 0.1:
+                    self.llm_promt(None, labels, False, True)
 
     def llm_promt(self, sttTexts, visionText, isSTT=True, isVision=True):
         if not self.llm:

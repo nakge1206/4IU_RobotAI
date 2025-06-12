@@ -29,8 +29,6 @@ class Gwiyomi:
         self.is_joy_y = False
         self.is_joy_b = False
 
-        self.main_thread_task_queue = queue.Queue()
-
         #module init
         self.yomi_core = Yomi(isSTT=True, isLLM=False, isTTS=True, isVision=False)
         self.yomi_face = Yomi_face()
@@ -54,9 +52,9 @@ class Gwiyomi:
         self.yomi_face.stop()
     
     def core_pause(self):
-        self.yomi_core.stt.pause()
+        self.yomi_core.master_flag = False
     def core_resume(self):
-        self.yomi_core.stt.resume()
+        self.yomi_core.master_flag = True
 
     def joy_callback(self, msg):
         """
@@ -67,11 +65,9 @@ class Gwiyomi:
             if msg.buttons[i] == 1:
                 if i == 3: # Y
                     self.isJoyY(True)
-                    # print("Y pressed")
                     rospy.loginfo("Y pressed")
                 elif i == 1: # B
                     self.isJoyB(True)
-                    # print("B pressed")
                     rospy.loginfo("B pressed")
             
     def isJoyY(self, is_joyY):
@@ -79,12 +75,14 @@ class Gwiyomi:
             if(is_joyY == True): # ON->ON
                 pass
             else: #ON->OFF
+                rospy.loginfo("Y : ON->OFF")
                 self.is_joy_y = False
         else:
             if(is_joyY == True): #OFF->ON
+                rospy.loginfo("Y : OFF->ON")
                 self.is_joy_y = True
                 self.isJoyB(False)
-                self.main_thread_task_queue.put(self.core_resume)
+                self.core_resume()
             else: #OFF->OFF
                 pass
     
@@ -93,38 +91,35 @@ class Gwiyomi:
             if(is_joyB == True): # ON->ON
                 pass
             else: #ON->OFF
+                rospy.loginfo("B : ON->OFF")
                 self.is_joy_b = False
         else:
             if(is_joyB == True): #OFF->ON
+                rospy.loginfo("B : OFF->ON")
                 self.is_joy_b = True
                 self.isJoyY(False)
-                self.main_thread_task_queue.put(self.core_pause)
+                self.core_pause()
             else: #OFF->OFF
                 pass
 
-
+    #yomi_face 관련함수
     def handle_emotion(self, msg):
         kor_emotion = msg.data.strip()
         eng_emotion = self.emotion_map.get(kor_emotion, "joy")  # 기본값은 joy
-        print(f"\n{eng_emotion}")
         self.yomi_face.set_emotion(eng_emotion)
     
     def tts_face(self, msg):
         is_tts = msg.data
-        print(str(is_tts))
         self.yomi_face.set_blinking(is_tts)
 
 if __name__ == "__main__":
+    print("A")
     service = Gwiyomi()
     service.start()
+    print("B")
 
     try:
         while not rospy.is_shutdown():
-            try:
-                task = service.main_thread_task_queue.get_nowait()
-                task()  # 등록된 함수 실행
-            except queue.Empty:
-                pass
             time.sleep(0.1)
 
     except KeyboardInterrupt:

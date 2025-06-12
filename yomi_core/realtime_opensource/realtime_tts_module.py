@@ -120,6 +120,7 @@ class TTSClient:
                 if self.on_done:
                     self.on_done()
 
+        # _send()
         threading.Thread(target=_send, daemon=True).start()
     
     def stop(self):
