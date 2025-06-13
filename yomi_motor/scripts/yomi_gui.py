@@ -59,7 +59,8 @@ class MotorControlGUI:
     def load_background(self):
         """창 크기에 맞게 배경 이미지를 로드하고 적용"""
         try:
-            image_path = "/home/micca/catkin_ws/src/yomi/scripts/image.png"
+            image_path = "/home/micca/catkin_ws/src/4IU_RobotAI/yomi_motor/scripts/image.png"
+
             image = Image.open(image_path)
             image = image.resize((1920, 1080))  # 창 크기에 맞게 조정
             self.bg_image = ImageTk.PhotoImage(image)
@@ -353,7 +354,7 @@ class MotorControlGUI:
         filename = filedialog.asksaveasfilename(
             defaultextension=".json",
             filetypes=[("JSON Files", "*.json")],
-            initialdir="/home/micca/catkin_ws/src/yomi/motion",
+            initialdir="/home/micca/catkin_ws/src/4IU_RobotAI/yomimotor/motion",
             title="Save Motion File"
         )
 
@@ -397,7 +398,7 @@ class MotorControlGUI:
         """파일 선택 대화상자를 통해 모션 데이터를 읽어와 슬라이더 값을 업데이트"""
         filename = filedialog.askopenfilename(
             title="Select Motion File",
-            initialdir="/home/micca/catkin_ws/src/yomi/motion",  # 기본 폴더 설정
+            initialdir="/home/micca/catkin_ws/src/4IU_RobotAI/yomi_motor/motion",  # 기본 폴더 설정
             filetypes=(("Text Files", "*.txt"), ("All Files", "*.*"))
         )
         if not filename:
