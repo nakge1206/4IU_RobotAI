@@ -45,7 +45,7 @@ class Yomi:
 
         # self.llm = LLMResponder() if isLLM else None
         self.llm = FineTunedGPTClient() if isLLM else None # gpt 사용시
-        self.vision = YoloModule(interval=2, on_vision_callback=self.handle_vision, viewGUI=True) if isVision else None
+        self.vision = YoloModule(interval=2, on_vision_callback=self.handle_vision, viewGUI=False) if isVision else None
         self.lastVision = None
         self.isVision = False
 
@@ -98,8 +98,8 @@ class Yomi:
             labels = [item['label'] for item in self.lastVision] if self.lastVision else None
             self.llm_promt(stt_texts, labels, isSTT=True, isVision=True)
             print("STT->LLM")
-        except Exception:
-            print("STT 처리 중 오류 발생")
+        except Exception as e:
+            print(f"LLM 처리 중 오류 발생 : {e}")
 
     def start_tts(self):
         """tts가 시작되면 tts_state topic에 True값 전송"""
@@ -143,9 +143,9 @@ class Yomi:
 
             # gpt 모델
             stt_text, metadata = sttTexts
-            emotion = metadata.get("emotion", "")
+            stt_emotion = metadata.get("stt_emotion", "")
             event = metadata.get("event", "")
-            user_prompt = self.llm.build_instruction(stt_text, emotion, event, visionText)
+            user_prompt = self.llm.build_instruction(stt_text, stt_emotion, event, visionText)
 
             emotion, response = self.llm.chat(user_prompt)
             print(f" LLM_emotion 결과: {emotion}")
@@ -169,6 +169,7 @@ class Yomi:
             user_prompt = self.llm.build_instruction_vision(visionText)
 
             emotion, response = self.llm.chat(user_prompt)
+            print(f" LLM 결과: {emotion}")
             print(f" LLM 결과: {response}")
 
             if self.tts:
@@ -215,11 +216,11 @@ if __name__ == "__main__":
     service = Yomi(isSTT=True, isLLM=True, isTTS=True, isVision=False)
 
     service.start()
-    # service.test_llm()
 
     try:
-        while not rospy.is_shutdown():
+        while True:
             time.sleep(0.1)
     except KeyboardInterrupt:
         print("\n 종료 중...")
+    finally:
         service.stop()

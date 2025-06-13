@@ -40,7 +40,7 @@ class FineTunedGPTClient:
         }  
         for key, values in emotion_wheel.items():
             if any(value in emotion_input for value in values):
-                    return key
+                return key
             return "기대" # defult value
 
     def extract_emotion(self, response: str) -> str:
@@ -54,14 +54,13 @@ class FineTunedGPTClient:
         return "기대"
 
 
-    def build_instruction(self, stt_text: str, emotion: str, event: str, vision:str=None) -> str:
+    def build_instruction(self, stt_text: str, stt_emotion: str, event: str, visionText:str=None) -> str:
         stt_text = stt_text.strip()
-        emotion = self.map_emotion_to_wheel(emotion)
 
-        if vision:
-            return f"청각정보는{stt_text}이고, 감정은 '{emotion}', 상황은 '{event}'이야. \n 시각정보는 {vision}이야."
+        if visionText:
+            return f"청각정보는{stt_text}이고, 감정은 '{stt_emotion}', 상황은 '{event}'이야. \n 시각정보는 {visionText}이야."
         else:
-            return f"청각정보는 {stt_text}이고, 감정은 '{emotion}', 상황은 '{event}'이야."
+            return f"청각정보는 {stt_text}이고, 감정은 '{stt_emotion}', 상황은 '{event}'이야."
         
     
     def build_instruction_vision(self, visionText):
@@ -79,6 +78,7 @@ class FineTunedGPTClient:
                 max_tokens=150
             )
             full_text = response.choices[0].message.content.strip()
+            print(full_text)
             
             emotion_part = full_text.split('/', 1)[0].strip()
             response_text = full_text.split('/', 1)[1].strip()

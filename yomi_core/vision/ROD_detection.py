@@ -14,11 +14,11 @@ class RealtimeObjectDetection:
 
     def load_model(self): # 학습된 데이터 셋 불러오는 함수
         model = torch.hub.load('ultralytics/yolov5', 'yolov5s', pretrained=True) # yolov5에 어떤 dataset을 쓸건지
-        ## model = torch.hub.load( ## 학습된 커스텀 파일 경로
-        ##     'ultralytics/yolov5',
-        ##     'custom',
-        ##     path='C:/yolov5/runs/train/coco_plus_custom/weights/best.pt'  
-        ## )
+        model = torch.hub.load( ## 학습된 커스텀 파일 경로
+            'ultralytics/yolov5',
+            'custom',
+            path='/home/micca/catkin_ws/src/4IU_RobotAI/yomi_core/vision/exp7/weights/best.pt'  
+        )
         return model
 
     def ObjectInfomation(self, frame): # 객체 정보 저장 함수
