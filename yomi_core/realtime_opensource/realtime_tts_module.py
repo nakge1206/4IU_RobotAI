@@ -108,7 +108,7 @@ class TTSClient:
                     self.on_start()
                 
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                    s.settimeout(20)  # gTTS 요청 지연 고려
+                    # s.settimeout(20)  # gTTS 요청 지연 고려
                     s.connect((self.host, self.port))
                     s.sendall(text.encode('utf-8'))
 
