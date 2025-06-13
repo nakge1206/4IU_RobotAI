@@ -78,9 +78,13 @@ class FineTunedGPTClient:
                 ],
                 max_tokens=150
             )
-            response_text = response.choices[0].message.content.strip()
-            emotion = self.extract_emotion(response_text)
-            return emotion, response_text 
+            full_text = response.choices[0].message.content.strip()
+            
+            emotion_part = full_text.split('/', 1)[0].strip()
+            response_text = full_text.split('/', 1)[1].strip()
+
+            emotion = self.extract_emotion(emotion_part)
+            return emotion, response_text
 
         except Exception as e:
             return "오류", f"(GPT 오류: {str(e)})"
