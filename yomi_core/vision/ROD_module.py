@@ -2,8 +2,8 @@ import os
 import cv2
 import threading
 import time
-from .ROD_detection import RealtimeObjectDetection
-from .ROD_log import DetectionLogger
+from ROD_detection import RealtimeObjectDetection
+from ROD_log import DetectionLogger
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"  # OpenMP 중복 방지
 
@@ -77,7 +77,11 @@ class YoloModule:
 
         while self.running:
             try:
+                if self.latest_frame is None or self.detections is None:
+                    print("⚠️ 아직 프레임 또는 감지 결과가 준비되지 않음")
+                    continue
                 frame = self.detector.plot_boxes(self.detections, self.latest_frame.copy())
+                frame = cv2.flip(frame, 0)
             except Exception as e:
                 print("🛑 plot_boxes 실패:", e)
                 continue
@@ -85,6 +89,10 @@ class YoloModule:
             cv2.putText(frame, f"FPS: {int(self.fps)}", (20, 50),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
             cv2.imshow('YOLOv5 Webcam Detection', frame)
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord('q'):
+                self.stop()
+                break
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 self.stop()

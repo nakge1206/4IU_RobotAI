@@ -36,6 +36,11 @@ class MotionSequenceExecutor:
         self.motor_speed_pub = rospy.Publisher('/motor_speed_cmd', Int16MultiArray, queue_size=10)
         self.motor_position_pub = rospy.Publisher('/motor_position_cmd', Int16MultiArray, queue_size=10)
         self.servo_angle_pub = rospy.Publisher('/servo_angle_cmd', Int16MultiArray, queue_size=8)
+
+        #모션입력 5초동안 안들어오면 차렷자세
+        self.last_received_time = time.time()  # 마지막 메시지 수신 시각 초기화
+        self.idle_timer = rospy.Timer(rospy.Duration(1), self.check_idle)  # 1초마다 체크
+        self.idle_pub = rospy.Publisher('/play_motion_sequence', String, queue_size=1)  # 원하는 토픽 이름
         
         #자율주행
         # self.goal_pub = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=10)
@@ -52,10 +57,16 @@ class MotionSequenceExecutor:
         rospy.loginfo("✅ Main Core Node with Object Navigation Initialized")
         rospy.spin()
 
+    def check_idle(self, event):
+        if time.time() - self.last_received_time > 5.0:
+            # rospy.logwarn("⏱ play_motion_sequence 토픽이 5초간 비활성 상태입니다.")
+            self.idle_pub.publish("stand_up")
+            self.last_received_time = time.time()  # 중복 퍼블리시 방지 (한 번만 보내고 다시 5초 기다림)
+
     def handle_sequence_request(self, msg):
         """동작 json파일을 읽어서 speed, position, servo, time값을 excute_sequence로 전송"""
         emotion = msg.data.strip()
-        base_path = "/home/micca/catkin_ws/src/yomi/motion"
+        base_path = "/home/micca/catkin_ws/src/4IU_RobotAI/yomi_motor/motion"
         file_path = os.path.join(base_path, f"{emotion}.json")
 
         if not os.path.isfile(file_path):
@@ -104,6 +115,7 @@ class MotionSequenceExecutor:
                 self.servo_angle_pub.publish(Int16MultiArray(data=servo_angles))
 
                 rospy.loginfo(f"✅ Executed motion at {motion['timestamp_ms']} ms")
+                self.last_received_time = time.time()
 
             except Exception as e:
                 rospy.logerr(f"❌ Error executing motion block: {e}")
