@@ -24,6 +24,9 @@ class Gwiyomi:
         rospy.Subscriber('/tts_state', Bool, self.tts_face)
         rospy.Subscriber('/joy', Joy, self.joy_callback)
 
+        #ros publisher
+        self.llm_emotion = rospy.Publisher('/play_motion_sequence', String, queue_size=10)
+
         #Joystick
         # self.prev_buttons = [0] * 10 #Joystick의 버튼의 상태변화를 저장하기 위한 변수
         self.is_joy_y = False
@@ -75,11 +78,11 @@ class Gwiyomi:
             if(is_joyY == True): # ON->ON
                 pass
             else: #ON->OFF
-                rospy.loginfo("Y : ON->OFF")
+                # rospy.loginfo("Y : ON->OFF")
                 self.is_joy_y = False
         else:
             if(is_joyY == True): #OFF->ON
-                rospy.loginfo("Y : OFF->ON")
+                # rospy.loginfo("Y : OFF->ON")
                 self.is_joy_y = True
                 self.isJoyB(False)
                 self.core_resume()
@@ -91,11 +94,11 @@ class Gwiyomi:
             if(is_joyB == True): # ON->ON
                 pass
             else: #ON->OFF
-                rospy.loginfo("B : ON->OFF")
+                # rospy.loginfo("B : ON->OFF")
                 self.is_joy_b = False
         else:
             if(is_joyB == True): #OFF->ON
-                rospy.loginfo("B : OFF->ON")
+                # rospy.loginfo("B : OFF->ON")
                 self.is_joy_b = True
                 self.isJoyY(False)
                 self.core_pause()
@@ -106,6 +109,7 @@ class Gwiyomi:
     def handle_emotion(self, msg):
         kor_emotion = msg.data.strip()
         eng_emotion = self.emotion_map.get(kor_emotion, "joy")  # 기본값은 joy
+        self.llm_emotion.publish(eng_emotion)
         self.yomi_face.set_emotion(eng_emotion)
     
     def tts_face(self, msg):
@@ -113,10 +117,8 @@ class Gwiyomi:
         self.yomi_face.set_blinking(is_tts)
 
 if __name__ == "__main__":
-    print("A")
     service = Gwiyomi()
     service.start()
-    print("B")
 
     try:
         while not rospy.is_shutdown():
