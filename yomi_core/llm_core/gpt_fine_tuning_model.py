@@ -15,7 +15,7 @@ class FineTunedGPTClient:
     def __init__(self, model_id: str = "ft:gpt-4o-2024-08-06:personal::BYBJcaH7"):
         self.model_id = model_id
         self.system_prompt = (
-            "너는 7살 유아야. 그리고 너의 mbti는 infp야. "
+            "너는 6살 유아야. 그리고 너의 mbti는 infp야. "
             "상황에 따라 감정 표현을 잘 하고, 반말을 쓰며, 친구처럼 말해. "
             "너무 어렵게 말하지 말고, 귀엽고 자연스럽게 이야기해."
             "대화에 .을 쓰지마"
@@ -40,8 +40,10 @@ class FineTunedGPTClient:
         }  
         for key, values in emotion_wheel.items():
             if any(value in emotion_input for value in values):
-                return key
-            return "기대" # defult value
+
+                    return key
+            return "기쁨" # defult value
+
 
     def extract_emotion(self, response: str) -> str:
         base_emotions = ["기쁨", "슬픔", "분노", "공포", "놀라움", "혐오", "신뢰", "기대"]
@@ -51,7 +53,7 @@ class FineTunedGPTClient:
             if emo in prefix:
                 return emo
             
-        return "기대"
+        return "기쁨"
 
 
     def build_instruction(self, stt_text: str, stt_emotion: str, event: str, visionText:str=None) -> str:

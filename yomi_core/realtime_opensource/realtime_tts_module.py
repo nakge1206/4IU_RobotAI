@@ -81,6 +81,8 @@ class TTSServer:
 
     def start(self):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s.settimeout(None)
             s.bind((self.host, self.port))
             s.listen()
             while True:
@@ -108,7 +110,7 @@ class TTSClient:
                     self.on_start()
                 
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                    # s.settimeout(20)  # gTTS 요청 지연 고려
+                    s.settimeout(None)  
                     s.connect((self.host, self.port))
                     s.sendall(text.encode('utf-8'))
 
