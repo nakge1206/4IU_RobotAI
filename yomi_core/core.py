@@ -121,8 +121,8 @@ class Yomi:
                 self.lastVision = visionText
                 labels = [item['label'] for item in self.lastVision] if self.lastVision else None
                 print(labels)
-                if random.random() < 0.1:
-                    self.llm_promt(None, labels, False, True)
+                # if random.random() < 0.1:
+                #     self.llm_promt(None, labels, False, True)
 
     def llm_promt(self, sttTexts, visionText, isSTT=True, isVision=True):
         if not self.llm:
