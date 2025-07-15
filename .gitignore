@@ -27,3 +27,7 @@ gsq_lora_beomi7b_out/
 
 #vision
 detections_log.json
+
+#TTS
+yomi_core/tts/checkpoints/
+yomi_core/tts/example/filelists/

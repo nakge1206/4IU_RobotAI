@@ -1,0 +1,3 @@
+LIBRARY core.cp38-win_amd64.pyd
+EXPORTS
+PyInit_core
