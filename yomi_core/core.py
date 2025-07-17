@@ -4,92 +4,103 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"  # OpenMP 중복 방지 설정
 import threading
 import random
 import time
-
 #ros통신용
 import rospy
 from std_msgs.msg import String, Bool
 
 
-
 # 모듈 경로 추가
 sys.path.append(os.path.join(os.path.dirname(__file__), 'realtime_opensource'))
 sys.path.append(os.path.join(os.path.dirname(__file__), 'llm_core'))
-sys.path.append(os.path.join(os.path.dirname(__file__), 'vision'))
+sys.path.append(os.path.join(os.path.dirname(__file__), 'vision_face'))
 
 # 각 모듈 임포트
-from realtime_opensource.realtime_stt_module import STTModule
+from realtime_opensource.realtime_stt_module import STTModule #STT
 # from realtime_opensource.realtime_tts_module import TTSClient, TTSServer  # TTS 연동 시 사용
 # from robot_core.inference_koalpaca_12B import LLMResponder
-from vision.ROD_module import YoloModule
-from llm_core.gpt_fine_tuning_model import FineTunedGPTClient 
+from vision_face.ROD_module import YoloModule #Vision
+from llm_core.gpt_fine_tuning_model import FineTunedGPTClient #GPT LLM
 
 
 
 class Yomi:
-    def __init__(self, isSTT=True, isTTS=True, isLLM=True, isVision=True):
-        self.results = []
+    def __init__(self, isSTT=True, isTTS=True, isLLM=True, isVision=False):
+        self.results = [] #
         self.is_tts_running = False
         self.lastVision = None
 
-        #어쩔마스터플래그
-        self.master_flag = True
+        self.isSTT = isSTT
+        self.isTTS = isTTS
+        self.isLLM = isLLM
+        self.isVision = isVision
+
+
+        #조이스틱 제어 플래그
+        self.joy_master_flag = True
 
         self.stt = STTModule(on_text_callback=self.handle_stt) if isSTT else None
-        print("STT : 실행 준비 완료")
+        print(f"STT : 준비완료 ({isSTT})")
 
         # self.tts_server = TTSServer()
-        print("TTSServer : 준비완료")
+        print(f"TTSServer : 준비완료 ({isTTS})")
+        
         # threading.Thread(target=self.tts_server.run_in_thread, daemon=True).start()
         # self.tts = TTSClient(on_done=self.done_tts, on_start=self.start_tts) if isTTS else None  # TTS 사용 시
         self.tts = None
-        print("TTSClient : 준비완료")
+        print(f"TTSClient : 준비완료 ({isTTS})")
 
         # self.llm = LLMResponder() if isLLM else None
         self.llm = FineTunedGPTClient() if isLLM else None # gpt 사용시
-        self.vision = YoloModule(interval=2, on_vision_callback=self.handle_vision, viewGUI=True) if isVision else None
-        self.lastVision = None
-        self.isVision = False
+        print(f"LLM : 준비완료 ({isLLM})")
 
-        #ros
+        self.vision = YoloModule(interval=2, on_vision_callback=self.handle_vision, viewGUI=True) if isVision else None
+        print(f"YOLO : 준비완료 ({isVision})")
+        
+
+        #ROS Publisher
         if not rospy.core.is_initialized():
             rospy.init_node('yomi_core', anonymous=True)
         self.llm_emotion = rospy.Publisher('/llm_emotion', String, queue_size=10)
         self.tts_state = rospy.Publisher('/tts_state', Bool, queue_size=10)
+        print("ROS : 토픽(감정, tts실행여부) 연결완료")
 
     def start(self):
-        if self.stt:
-            self.stt.start()
-        if self.tts:
+        if self.isSTT:
+            threading.Thread(target=self.sttStart, daemon=True).start()
+        if self.isTTS:
             pass
             # self.tts.connect() 
-        if self.vision:
-            self.isVision = True
+        if self.isVision:
             self.vision.start()
-        print("yomi_core 시스템 준비완료...")
 
     def stop(self):
-        if self.stt: 
+        if self.isSTT: 
             self.stt.stop()
-        # if self.llm: 
-        #   self.llm.stop() 추후 추가할 예정
-        if self.tts: 
+        if self.isTTS: 
             pass
             # self.tts.stop()
-        if self.vision: 
+        if self.isVision: 
             self.vision.stop()
         print("모든 모듈 종료")
+
+    def sttStart(self):
+        self.stt.start()
+        while True:
+            time.sleep(1)
+            self.resume()
+
     
     def pause(self):
-        if self.stt:
-            self.stt.pause()
+        """"STT 및 Vision 일시정지"""
+        if self.isSTT:
+            self.stt.micOff()
         self.isVision=False
 
     def resume(self):
-        #마스터 플래그가 true야 돌아가도록
-        if self.master_flag:
-            if self.stt and not self.is_tts_running:
-                self.stt.resume()
-            self.isVision=True
+        if self.joy_master_flag and not self.is_tts_running and self.isSTT:
+            self.stt.micOn()
+            
+        self.isVision=True
     
     def handle_stt(self, stt_texts):
         """STTModule에서 text가 생성될 때 마다 이 코드가 실행됨"""
@@ -98,8 +109,7 @@ class Yomi:
         try:
             print(f"\n STT 결과: {stt_texts}")                
             labels = [item['label'] for item in self.lastVision] if self.lastVision else None
-            self.llm_promt(stt_texts, labels, isSTT=True, isVision=True)
-            print("STT->LLM")
+            self.llm_promt(stt_texts, labels)
         except Exception as e:
             print(f"LLM 처리 중 오류 발생 : {e}")
 
@@ -111,31 +121,31 @@ class Yomi:
         """TTS가 끝날때 마다 이 코드가 실행됨"""
         self.tts_state.publish(False)
         self.is_tts_running = False
-        if not self.master_flag:
-            threading.Timer(2.0, self.done_tts).start()
-        else:
-            self.resume()
+        # if not self.joy_master_flag:
+        #     threading.Timer(2.0, self.done_tts).start()
+        # else:
+        #     self.resume()
 
     def handle_vision(self, visionText):
         """vision이 감지될때 마다 이 코드가 실행됨"""
-        if self.master_flag:
-            if self.isVision:
-                self.lastVision = visionText
-                labels = [item['label'] for item in self.lastVision] if self.lastVision else None
-                print(labels)
-                # if random.random() < 0.1:
-                #     self.llm_promt(None, labels, False, True)
+        if self.joy_master_flag and self.isVision:
+            self.lastVision = visionText
+            labels = [item['label'] for item in self.lastVision] if self.lastVision else None
+            print(labels)
+            # if random.random() < 0.1:
+            #     self.llm_promt(None, labels, False, True)
 
-    def llm_promt(self, sttTexts, visionText, isSTT=True, isVision=True):
-        if not self.llm:
+    def llm_promt(self, sttTexts, visionText):
+        if not self.isLLM:
+            self.is_tts_running = False
+            self.resume()
             if self.tts: #근데 tts는 켜져있을 때
                 if sttTexts:
                     pass
                     # self.tts.send_text(sttTexts[0])
             return
 
-
-        if isSTT and isVision: #STT가 들어올때(영상정보까지 포함됨).
+        if self.isSTT and self.isVision: #STT가 들어올때(영상정보까지 포함됨).
             # gsq 모델
             # response = self.llm.generate_response(
             #         stt_text,
@@ -167,7 +177,7 @@ class Yomi:
                 #     print("TTS가 아직 끝나지 않았습니다. 새 요청 무시.")
             return
         
-        if not isSTT and isVision:
+        if not self.isSTT and self.isVision:
             print("YOLO->LLM, 시각정보 : ", visionText)
             user_prompt = self.llm.build_instruction_vision(visionText)
 
@@ -188,7 +198,7 @@ class Yomi:
 
     
     def test_llm(self):
-        if self.llm:
+        if self.isLLM:
             # gsq 모델
             # response = self.llm.generate_response(
             #         stt_text,
