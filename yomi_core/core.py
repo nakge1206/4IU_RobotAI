@@ -18,7 +18,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'vision'))
 
 # 각 모듈 임포트
 from realtime_opensource.realtime_stt_module import STTModule
-from realtime_opensource.realtime_tts_module import TTSClient, TTSServer  # TTS 연동 시 사용
+# from realtime_opensource.realtime_tts_module import TTSClient, TTSServer  # TTS 연동 시 사용
 # from robot_core.inference_koalpaca_12B import LLMResponder
 from vision.ROD_module import YoloModule
 from llm_core.gpt_fine_tuning_model import FineTunedGPTClient 
@@ -37,15 +37,16 @@ class Yomi:
         self.stt = STTModule(on_text_callback=self.handle_stt) if isSTT else None
         print("STT : 실행 준비 완료")
 
-        self.tts_server = TTSServer()
+        # self.tts_server = TTSServer()
         print("TTSServer : 준비완료")
-        threading.Thread(target=self.tts_server.run_in_thread, daemon=True).start()
-        self.tts = TTSClient(on_done=self.done_tts, on_start=self.start_tts) if isTTS else None  # TTS 사용 시
+        # threading.Thread(target=self.tts_server.run_in_thread, daemon=True).start()
+        # self.tts = TTSClient(on_done=self.done_tts, on_start=self.start_tts) if isTTS else None  # TTS 사용 시
+        self.tts = None
         print("TTSClient : 준비완료")
 
         # self.llm = LLMResponder() if isLLM else None
         self.llm = FineTunedGPTClient() if isLLM else None # gpt 사용시
-        self.vision = YoloModule(interval=2, on_vision_callback=self.handle_vision, viewGUI=False) if isVision else None
+        self.vision = YoloModule(interval=2, on_vision_callback=self.handle_vision, viewGUI=True) if isVision else None
         self.lastVision = None
         self.isVision = False
 
@@ -72,7 +73,8 @@ class Yomi:
         # if self.llm: 
         #   self.llm.stop() 추후 추가할 예정
         if self.tts: 
-            self.tts.stop()
+            pass
+            # self.tts.stop()
         if self.vision: 
             self.vision.stop()
         print("모든 모듈 종료")
@@ -128,7 +130,8 @@ class Yomi:
         if not self.llm:
             if self.tts: #근데 tts는 켜져있을 때
                 if sttTexts:
-                    self.tts.send_text(sttTexts[0])
+                    pass
+                    # self.tts.send_text(sttTexts[0])
             return
 
 
@@ -154,7 +157,7 @@ class Yomi:
 
             if self.tts:
                 print("LLM->TTS")
-                self.tts.send_text(response)
+                # self.tts.send_text(response)
                 self.llm_emotion.publish(emotion)
                 # if not self.is_tts_running:
                 #     self.is_tts_running = True  # 재생 중 플래그
@@ -176,11 +179,12 @@ class Yomi:
                 if not self.is_tts_running:
                     self.is_tts_running = True
                     print("LLM->TTS")
-                    self.tts.send_text(response)
+                    # self.tts.send_text(response)
 
         else: #llm 껐을때
             if self.tts: #근데 tts는 켜져있을 때
-                self.tts.send_text(stt_text)
+                pass
+                # self.tts.send_text(stt_text)
 
     
     def test_llm(self):
