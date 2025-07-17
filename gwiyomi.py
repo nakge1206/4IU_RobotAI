@@ -11,7 +11,7 @@ import queue
 sys.path.append(os.path.join(os.path.dirname(__file__), 'yomi_core/'))
 sys.path.append(os.path.join(os.path.dirname(__file__), 'yomi_face/'))
 from yomi_core.core import Yomi
-from yomi_face.kao import Yomi_face
+# from yomi_face.kao import Yomi_face
 
 class Gwiyomi:
     def __init__(self):
@@ -33,31 +33,31 @@ class Gwiyomi:
         self.is_joy_b = False
 
         #module init
-        self.yomi_core = Yomi(isSTT=True, isLLM=False, isTTS=True, isVision=True)
-        self.yomi_face = Yomi_face()
-        self.emotion_map = {
-            "기쁨": "joy",
-            "슬픔": "sadness",
-            "분노": "angry",
-            "공포": "fear",
-            "놀라움": "surprise",
-            "혐오": "disgust",
-            "신뢰": "trust",
-            "기대": "anticipation"
-        }
+        self.yomi_core = Yomi(isSTT=True, isTTS=False, isLLM=False, isVision=True)
+        # self.yomi_face = Yomi_face()
+        # self.emotion_map = {
+        #     "기쁨": "joy",
+        #     "슬픔": "sadness",
+        #     "분노": "angry",
+        #     "공포": "fear",
+        #     "놀라움": "surprise",
+        #     "혐오": "disgust",
+        #     "신뢰": "trust",
+        #     "기대": "anticipation"
+        # }
     
     def start(self):
         self.yomi_core.start()
-        self.yomi_face.start()
+        # self.yomi_face.start()
     
     def stop(self):
         self.yomi_core.stop()
-        self.yomi_face.stop()
+        # self.yomi_face.stop()
     
     def core_pause(self):
-        self.yomi_core.master_flag = False
+        self.yomi_core.joy_master_flag = False
     def core_resume(self):
-        self.yomi_core.master_flag = True
+        self.yomi_core.joy_master_flag = True
 
     def joy_callback(self, msg):
         """
@@ -106,15 +106,15 @@ class Gwiyomi:
                 pass
 
     #yomi_face 관련함수
-    def handle_emotion(self, msg):
-        kor_emotion = msg.data.strip()
-        eng_emotion = self.emotion_map.get(kor_emotion, "joy")  # 기본값은 joy
-        self.llm_emotion.publish(eng_emotion)
-        self.yomi_face.set_emotion(eng_emotion)
+    # def handle_emotion(self, msg):
+    #     kor_emotion = msg.data.strip()
+    #     eng_emotion = self.emotion_map.get(kor_emotion, "joy")  # 기본값은 joy
+    #     self.llm_emotion.publish(eng_emotion)
+    #     self.yomi_face.set_emotion(eng_emotion)
     
-    def tts_face(self, msg):
-        is_tts = msg.data
-        self.yomi_face.set_blinking(is_tts)
+    # def tts_face(self, msg):
+    #     is_tts = msg.data
+    #     self.yomi_face.set_blinking(is_tts)
 
 if __name__ == "__main__":
     service = Gwiyomi()

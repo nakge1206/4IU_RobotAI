@@ -18,8 +18,7 @@ class STTModule:
             allowed_latency_limit = 100, #큐에 저장하는 최대 청크 수
             no_log_file = False # False면 디버그파일을 만들지 않음
         )
-        self.is_running = False
-        self.is_mic = False
+        self.isMic = True
 
     def _run(self):
         result = self.recorder.text()
@@ -28,20 +27,24 @@ class STTModule:
 
     def start(self):
         """ stt 실행 """
-        self.is_running = True
-        self.is_mic = True
-        
         self._run()
 
     def stop(self):
         """ stt 정지 """
         self.recorder.shutdown()
 
-    def pause(self):
-        """ stt 일시정지(마이크 비활성화) """
+    def micOff(self):
+        """ stt 마이크 비활성화 (일시정지)"""
+        print("micOFF")
+        self.isMic = False
         self.recorder.set_microphone(False)
+        
 
-    def resume(self):
-        """ stt 제개(마이크 활성화) """
-        self.recorder.set_microphone(True)
-        self._run()
+    def micOn(self):
+        """ stt 마이크 활성화 (제개)"""
+        if not self.isMic:
+            print("micON")
+            self.recorder.set_microphone(True)
+            self.isMic = True
+            self._run()
+            
