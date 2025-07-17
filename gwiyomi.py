@@ -33,7 +33,7 @@ class Gwiyomi:
         self.is_joy_b = False
 
         #module init
-        self.yomi_core = Yomi(isSTT=True, isLLM=True, isTTS=True, isVision=True)
+        self.yomi_core = Yomi(isSTT=True, isLLM=False, isTTS=True, isVision=True)
         self.yomi_face = Yomi_face()
         self.emotion_map = {
             "기쁨": "joy",

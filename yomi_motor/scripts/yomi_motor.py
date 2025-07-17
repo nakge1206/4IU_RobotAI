@@ -41,6 +41,7 @@ class MotionSequenceExecutor:
         self.last_received_time = time.time()  # 마지막 메시지 수신 시각 초기화
         self.idle_timer = rospy.Timer(rospy.Duration(1), self.check_idle)  # 1초마다 체크
         self.idle_pub = rospy.Publisher('/play_motion_sequence', String, queue_size=1)  # 원하는 토픽 이름
+        self.max_motion_delay = 11
         
         #자율주행
         # self.goal_pub = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=10)
@@ -58,8 +59,8 @@ class MotionSequenceExecutor:
         rospy.spin()
 
     def check_idle(self, event):
-        if time.time() - self.last_received_time > 5.0:
-            # rospy.logwarn("⏱ play_motion_sequence 토픽이 5초간 비활성 상태입니다.")
+        if time.time() - self.last_received_time > self.max_motion_delay:
+            rospy.logwarn(f"play_motion_sequence 토픽이 {self.max_motion_delay}초간 비활성 상태입니다.")
             self.idle_pub.publish("stand_up")
             self.last_received_time = time.time()  # 중복 퍼블리시 방지 (한 번만 보내고 다시 5초 기다림)
 

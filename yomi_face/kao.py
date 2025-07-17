@@ -40,6 +40,7 @@ class Yomi_face:
     def set_emotion(self, emotion):
         """input : emotion(angry, anticipation, disgust, fear, joy, sadness, surprise, trust)"""
         if emotion in self.image_paths:
+            print("change emotion")
             self.emotion = emotion
             self.img_index = 0
 
