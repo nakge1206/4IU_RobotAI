@@ -10,16 +10,18 @@ from std_msgs.msg import String, Bool
 
 
 # 모듈 경로 추가
-sys.path.append(os.path.join(os.path.dirname(__file__), 'realtime_opensource'))
+sys.path.append(os.path.join(os.path.dirname(__file__), 'stt'))
 sys.path.append(os.path.join(os.path.dirname(__file__), 'llm_core'))
+sys.path.append(os.path.join(os.path.dirname(__file__), 'tts'))
 sys.path.append(os.path.join(os.path.dirname(__file__), 'vision_face'))
 
+
 # 각 모듈 임포트
-from realtime_opensource.realtime_stt_module import STTModule #STT
+from stt.realtime_stt_module import STTModule #STT
 # from realtime_opensource.realtime_tts_module import TTSClient, TTSServer  # TTS 연동 시 사용
 # from robot_core.inference_koalpaca_12B import LLMResponder
 from tts.TTS_server import TTSServer, TTSClient
-from vision_face.ROD_module import YoloModule #Vision
+from vision_face.VisionFace import VisonFaceMain #Vision
 from llm_core.gpt_fine_tuning_model import FineTunedGPTClient #GPT LLM
 
 
