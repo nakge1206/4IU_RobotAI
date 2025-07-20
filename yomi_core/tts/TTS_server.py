@@ -18,8 +18,8 @@ from text import text_to_sequence
 class VITS:
     def __init__(self):
         # 경로를 고정으로 내장
-        checkpoint = r"C:\\Users\\COM\\Desktop\\vits\\checkpoints\\logs\\korean_vits\\G_212000.pth"
-        config = r"C:\\Users\\COM\\Desktop\\vits\\example\\configs\\korean.json"
+        checkpoint = r"src/4IU_RobotAI/yomi_core/tts/checkpoints/G_212000.pth"
+        config = r"src/4IU_RobotAI/yomi_core/tts/example/configs/korean.json"
 
         self.hps = utils.get_hparams_from_file(config)
         self.spk_count = self.hps.data.n_speakers

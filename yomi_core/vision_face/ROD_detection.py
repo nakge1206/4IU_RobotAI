@@ -17,7 +17,7 @@ class RealtimeObjectDetection:
         model = torch.hub.load( ## 학습된 커스텀 파일 경로
             'ultralytics/yolov5',
             'custom',
-            path='/home/micca/catkin_ws/src/4IU_RobotAI/yomi_core/vision/exp7/weights/best.pt'  
+            path='/home/micca/catkin_ws/src/4IU_RobotAI/yomi_core/vision_face/exp7/weights/best.pt'  
         )
         return model
 
