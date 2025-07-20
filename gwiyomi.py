@@ -20,8 +20,8 @@ class Gwiyomi:
             rospy.init_node('gwiyomi', anonymous=True)
         
         #ros subscriber
-        rospy.Subscriber('/llm_emotion', String, self.handle_emotion)
-        rospy.Subscriber('/tts_state', Bool, self.tts_face)
+        # rospy.Subscriber('/llm_emotion', String, self.handle_emotion)
+        # rospy.Subscriber('/tts_state', Bool, self.tts_face)
         rospy.Subscriber('/joy', Joy, self.joy_callback)
 
         #ros publisher
@@ -33,7 +33,7 @@ class Gwiyomi:
         self.is_joy_b = False
 
         #module init
-        self.yomi_core = Yomi(isSTT=True, isTTS=False, isLLM=False, isVision=True)
+        self.yomi_core = Yomi(isSTT=True, isTTS=False, isLLM=False, isVisionFace=True)
         # self.yomi_face = Yomi_face()
         # self.emotion_map = {
         #     "기쁨": "joy",

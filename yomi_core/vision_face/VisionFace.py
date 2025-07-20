@@ -115,10 +115,13 @@ class FaceController(QObject):
         print("[Face_Controller] Stopped")
 
 class YoloWorker(threading.Thread):
-    def __init__(self):
+    def __init__(self, interval=1.0, isLog=False, on_vision_callback=None):
         super().__init__()
         self.detector = RealtimeObjectDetection()
-        self.logger = DetectionLogger()
+        self.logger = DetectionLogger() if isLog else None
+        self.on_vision_callback = on_vision_callback
+        self.interval = interval
+
         self.frame = None
         self.detections = None
         self.running = True
@@ -127,6 +130,11 @@ class YoloWorker(threading.Thread):
 
     def run(self):
         cap = cv2.VideoCapture(0)
+        if not cap.isOpened():
+            print("[YOLO] 카메라 열기 실패")
+            return
+        
+        last_detection_time = 0
         while self.running:
             ret, frame = cap.read()
             if not ret:
@@ -136,17 +144,30 @@ class YoloWorker(threading.Thread):
                 self.frame = frame.copy()
                 self.detections = detection
             time.sleep(0.01)
+
+            current_time = time.time()
+            if current_time - last_detection_time >= self.interval:
+                last_detection_time = current_time
+                if self.on_vision_callback:
+                    self.on_vision_callback(self.detections)
+                if self.logger:
+                    self.logger.add(self.detections)
+
         cap.release()
+        if self.logger:
+            self.logger.save()
+            print("[YOLO] 로그 저장 완료")
 
     def stop(self):
         self.running = False
+        self.join()
 
     def _get_latest(self):
         with self.lock:
             return self.frame.copy() if self.frame is not None else None, self.detections
 
 class VisonFaceMain:
-    def __init__(self, isFPS = False):
+    def __init__(self, interval=1.0, isLog=False, on_vision_callback=None, viewGUI=True, isFPS=False):
         self.app = QApplication(sys.argv)
 
         # Face UI 및 제어
@@ -160,9 +181,10 @@ class VisonFaceMain:
         self.controller_thread.start()
 
         # YOLO 감지 스레드
-        self.yoloWorker = YoloWorker()
+        self.yoloWorker = YoloWorker(interval=interval, isLog=isLog, on_vision_callback=on_vision_callback)
         self.yoloWorker.start()
 
+        self.viewGUI = viewGUI
         self.running = True
         self.isFPS = isFPS
 
@@ -170,6 +192,12 @@ class VisonFaceMain:
         self.app.aboutToQuit.connect(self._quit)
 
     def key_handler(self, event):
+        """
+        space - 다음 감정 변환
+        B - 입 뻥긋 활성화
+        Y - 입 뻥긋 비활성화
+        Q - 종료
+        """
         if event.key() == Qt.Key_Space:
             self.controller.next_emotion()
         elif event.key() == Qt.Key_B:
@@ -186,35 +214,46 @@ class VisonFaceMain:
         self.controller.stop()
         self.controller_thread.quit()
         self.controller_thread.wait()
-        cv2.destroyAllWindows()
+        if self.viewGUI:
+            cv2.destroyAllWindows()
 
     def stop(self):
         """VisionFace 전체 종료"""
         self.running = False
         self.app.quit()
 
-    def get_detections(self):
+    def vision_get_detections(self):
         """현재 탐지한 객체 받아오기"""
         return self.yoloWorker.detections
 
+    def face_set_blinking(self, value: bool):
+        """입 움직이는지 설정"""
+        self.controller.set_blinking(value)
+
+    def face_set_emotion(self, emotion: str):
+        """감정 변경"""
+        self.controller.set_emotion(emotion)
+
     def run(self):
+        """실행"""
         while self.running:
             frame, detections = self.yoloWorker._get_latest()
             if frame is not None:
-                frame = self.yoloWorker.detector.plot_boxes(detections, frame)
-                frame = cv2.flip(frame, -1)
+                if self.viewGUI:
+                    frame = self.yoloWorker.detector.plot_boxes(detections, frame)
+                    frame = cv2.flip(frame, -1)
 
-                if self.isFPS:
-                    curr_time = time.time()
-                    fps = 1.0 / (curr_time - self.yoloWorker.prev_time)
-                    self.yoloWorker.prev_time = curr_time
+                    if self.isFPS:
+                        curr_time = time.time()
+                        fps = 1.0 / (curr_time - self.yoloWorker.prev_time)
+                        self.yoloWorker.prev_time = curr_time
 
-                    cv2.putText(frame, f"FPS: {fps:.1f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
-                cv2.imshow("YOLO", frame)
+                        cv2.putText(frame, f"FPS: {fps:.1f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
+                    cv2.imshow("YOLO", frame)
 
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                    self.running = False
-                    break
+                    if cv2.waitKey(1) & 0xFF == ord('q'):
+                        self.running = False
+                        break
             
             #PyQt 실행 함수
             self.app.processEvents()
