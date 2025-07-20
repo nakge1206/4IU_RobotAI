@@ -20,14 +20,14 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'vision_face'))
 from stt.realtime_stt_module import STTModule #STT
 # from realtime_opensource.realtime_tts_module import TTSClient, TTSServer  # TTS 연동 시 사용
 # from robot_core.inference_koalpaca_12B import LLMResponder
-from tts.TTS_server import TTSServer, TTSClient
+# from tts.TTS_server import TTSServer, TTSClient
 from vision_face.VisionFace import VisonFaceMain #Vision
 from llm_core.gpt_fine_tuning_model import FineTunedGPTClient #GPT LLM
 
 
 
 class Yomi:
-    def __init__(self, isSTT=True, isTTS=True, isLLM=True, isVision=False):
+    def __init__(self, isSTT=True, isTTS=True, isLLM=True, isVisionFace=False):
         self.results = [] #
         self.is_tts_running = False
         self.lastVision = None
@@ -35,8 +35,7 @@ class Yomi:
         self.isSTT = isSTT
         self.isTTS = isTTS
         self.isLLM = isLLM
-        self.isVision = isVision
-
+        self.isVision = isVisionFace
 
         #조이스틱 제어 플래그
         self.joy_master_flag = True
@@ -47,17 +46,16 @@ class Yomi:
         # self.tts_server = TTSServer()
         print(f"TTSServer : 준비완료 ({isTTS})")
         
-        # threading.Thread(target=self.tts_server.run_in_thread, daemon=True).start()
+        # threading.Thread(target=self.tts_server._run, daemon=True).start()
         # self.tts = TTSClient(on_done=self.done_tts, on_start=self.start_tts) if isTTS else None  # TTS 사용 시
-        self.tts = None
         print(f"TTSClient : 준비완료 ({isTTS})")
 
         # self.llm = LLMResponder() if isLLM else None
         self.llm = FineTunedGPTClient() if isLLM else None # gpt 사용시
         print(f"LLM : 준비완료 ({isLLM})")
 
-        self.vision = YoloModule(interval=2, on_vision_callback=self.handle_vision, viewGUI=True) if isVision else None
-        print(f"YOLO : 준비완료 ({isVision})")
+        self.VisionFace = VisonFaceMain(interval=2, on_vision_callback=self.handle_vision, viewGUI=True) if isVisionFace else None
+        print(f"VisionFace : 준비완료 ({isVisionFace})")
         
 
         #ROS Publisher
@@ -74,7 +72,7 @@ class Yomi:
             pass
             # self.tts.connect() 
         if self.isVision:
-            self.vision.start()
+            self.VisionFace.run()
 
     def stop(self):
         if self.isSTT: 
@@ -83,7 +81,7 @@ class Yomi:
             pass
             # self.tts.stop()
         if self.isVision: 
-            self.vision.stop()
+            self.VisionFace.stop()
         print("모든 모듈 종료")
 
     def sttStart(self):
@@ -92,7 +90,6 @@ class Yomi:
             time.sleep(1)
             self.resume()
 
-    
     def pause(self):
         """"STT 및 Vision 일시정지"""
         if self.isSTT:
@@ -124,10 +121,6 @@ class Yomi:
         """TTS가 끝날때 마다 이 코드가 실행됨"""
         self.tts_state.publish(False)
         self.is_tts_running = False
-        # if not self.joy_master_flag:
-        #     threading.Timer(2.0, self.done_tts).start()
-        # else:
-        #     self.resume()
 
     def handle_vision(self, visionText):
         """vision이 감지될때 마다 이 코드가 실행됨"""
