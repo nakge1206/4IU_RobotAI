@@ -61,7 +61,7 @@ class Yomi:
         #ROS Publisher
         if not rospy.core.is_initialized():
             rospy.init_node('yomi_core', anonymous=True)
-        self.llm_emotion = rospy.Publisher('/llm_emotion', String, queue_size=10)
+        # self.llm_emotion = rospy.Publisher('/llm_emotion', String, queue_size=10)
         self.tts_state = rospy.Publisher('/tts_state', Bool, queue_size=10)
         print("ROS : 토픽(감정, tts실행여부) 연결완료")
 
@@ -151,12 +151,12 @@ class Yomi:
             emotion, response = self.llm.chat(user_prompt)
             print(f" LLM_emotion 결과: {emotion}")
             print(f" LLM 결과: {response}")
-            self.llm_emotion.publish(emotion)
+            # self.llm_emotion.publish(emotion)
 
-            if self.tts:
+            if self.isTTS:
                 print("LLM->TTS")
                 # self.tts.send_text(response)
-                self.llm_emotion.publish(emotion)
+                # self.llm_emotion.publish(emotion)
                 # if not self.is_tts_running:
                 #     self.is_tts_running = True  # 재생 중 플래그
                 #     print("LLM->TTS")

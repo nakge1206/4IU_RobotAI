@@ -2,7 +2,7 @@ import os
 import sys
 from PyQt5.QtWidgets import QApplication, QLabel, QWidget, QVBoxLayout
 from PyQt5.QtCore import Qt, QTimer, QThread, QObject, pyqtSignal
-from PyQt5.QtGui import QPixmap, QImage, QTransform
+from PyQt5.QtGui import QPixmap, QImage, QTransform, QMovie
 
 import cv2
 import threading
@@ -25,6 +25,7 @@ class YomiFace(QWidget):
 
         self.label = QLabel(self)
         self.label.setAlignment(Qt.AlignCenter)
+        self.label.setScaledContents(True)  # 자동 사이즈 조정
 
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
@@ -34,6 +35,28 @@ class YomiFace(QWidget):
 
     def set_emotion_pixmap(self, pixmap: QPixmap):
         self.label.setPixmap(pixmap)
+        
+    def set_emotion_movie(self, gif_path: str):
+        if hasattr(self, 'movie') and self.movie is not None:
+            self.label.clear()
+            self.movie.stop()
+            del self.movie
+
+        self.movie = QMovie(gif_path)
+        if not self.movie.isValid():
+            print(f"[Face_ERROR] GIF 로딩 실패: {gif_path}")
+            return
+
+        from PyQt5.QtCore import QSize
+        self.movie.setScaledSize(QSize(self.width(), self.height()))
+        self.label.setMovie(self.movie)
+        self.movie.start()
+
+    def resizeEvent(self, event):
+        if hasattr(self, 'movie') and self.movie is not None:
+            self.movie.setScaledSize(self.size())
+        super().resizeEvent(event)
+
 
 
 class FaceController(QObject):
@@ -52,46 +75,53 @@ class FaceController(QObject):
 
     def initialize(self, gui):
         self.gui = gui
-        self.timer = QTimer()
-        self.timer.setInterval(100)
-        self.timer.timeout.connect(self.update_emotion)
-        self.timer.start()
+        self.gui.set_emotion_movie(self.image_paths)
+        # self.timer = QTimer()
+        # self.timer.setInterval(100)
+        # self.timer.timeout.connect(self.update_emotion)
+        # self.timer.start()
 
     def _load_image_paths(self):
         """감정에 맞는 이미지 경로 찾기"""
         base = os.path.join(self.script_dir, 'blackface')
-        return {
-            emotion: (
-                os.path.join(base, f'black_{emotion}D.png'),
-                os.path.join(base, f'black_{emotion}S.png')
-            ) for emotion in self.emotions
-        }
+        return os.path.join(base, 'yomi_1.gif')
+        # return {
+        #     emotion: (
+        #         os.path.join(base, f'black_{emotion}D.png'),
+        #         os.path.join(base, f'black_{emotion}S.png')
+        #     ) for emotion in self.emotions
+        # }
+
+    # def update_emotion(self):
+    #     """현재 감정에 따라 GUI업데이트"""
+    #     if self.blinking:
+    #         self.img_index = (self.img_index + 1) % 2
+    #     else:
+    #         self.img_index = 0
+
+    #     emotion = self.emotions[self.emotion_index]
+    #     cache_key = (emotion, self.img_index)
+
+    #     if cache_key in self.scaled_cache:
+    #         pixmap = self.scaled_cache[cache_key]
+    #     else:
+    #         path = self.image_paths[emotion][self.img_index]
+    #         path = self.image_paths
+    #         pixmap = QPixmap(path)
+    #         if pixmap.isNull():
+    #             print(f"[Face_ERROR] 이미지 불러오기 실패 : {path}")
+    #             return
+    #         pixmap = pixmap.scaled(
+    #             self.gui.width(), self.gui.height(),
+    #             Qt.IgnoreAspectRatio, Qt.SmoothTransformation
+    #         )
+    #         self.scaled_cache[cache_key] = pixmap
+
+    #     self.gui.set_emotion_pixmap(pixmap)
 
     def update_emotion(self):
-        """현재 감정에 따라 GUI업데이트"""
-        if self.blinking:
-            self.img_index = (self.img_index + 1) % 2
-        else:
-            self.img_index = 0
-
-        emotion = self.emotions[self.emotion_index]
-        cache_key = (emotion, self.img_index)
-
-        if cache_key in self.scaled_cache:
-            pixmap = self.scaled_cache[cache_key]
-        else:
-            path = self.image_paths[emotion][self.img_index]
-            pixmap = QPixmap(path)
-            if pixmap.isNull():
-                print(f"[Face_ERROR] 이미지 불러오기 실패 : {path}")
-                return
-            pixmap = pixmap.scaled(
-                self.gui.width(), self.gui.height(),
-                Qt.IgnoreAspectRatio, Qt.SmoothTransformation
-            )
-            self.scaled_cache[cache_key] = pixmap
-
-        self.gui.set_emotion_pixmap(pixmap)
+        """단일 GIF 애니메이션 디버깅"""
+        pass
 
     def set_blinking(self, value: bool):
         """입 움직이는지 설정"""
