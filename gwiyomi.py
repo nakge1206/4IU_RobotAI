@@ -9,7 +9,7 @@ import queue
 
 #모듈 추가
 sys.path.append(os.path.join(os.path.dirname(__file__), 'yomi_core/'))
-sys.path.append(os.path.join(os.path.dirname(__file__), 'yomi_face/'))
+# sys.path.append(os.path.join(os.path.dirname(__file__), 'yomi_face/'))
 from yomi_core.core import Yomi
 # from yomi_face.kao import Yomi_face
 

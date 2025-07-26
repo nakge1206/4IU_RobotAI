@@ -18,7 +18,6 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'vision_face'))
 
 # 각 모듈 임포트
 from stt.realtime_stt_module import STTModule #STT
-# from realtime_opensource.realtime_tts_module import TTSClient, TTSServer  # TTS 연동 시 사용
 # from robot_core.inference_koalpaca_12B import LLMResponder
 # from tts.TTS_server import TTSServer, TTSClient
 from vision_face.VisionFace import VisonFaceMain #Vision
