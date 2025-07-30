@@ -20,13 +20,13 @@ class MotionSequenceExecutor:
             rospy.init_node('yomi_motor', anonymous=True)
 
         #Subscriber
-        rospy.Subscriber('/play_motion_sequence', String, self.handle_sequence_request)
-        rospy.Subscriber('/switch_1_state', Bool, self.switch_callback, callback_args=1)
-        rospy.Subscriber('/switch_2_state', Bool, self.switch_callback, callback_args=2)
-        rospy.Subscriber('/switch_3_state', Bool, self.switch_callback, callback_args=3)
-        rospy.Subscriber('/switch_4_state', Bool, self.switch_callback, callback_args=4)
-        rospy.Subscriber('/switch_5_state', Bool, self.switch_callback, callback_args=5)
-        rospy.Subscriber('/switch_6_state', Bool, self.switch_callback, callback_args=6)
+        # rospy.Subscriber('/play_motion_sequence', String, self.handle_sequence_request)
+        # rospy.Subscriber('/switch_1_state', Bool, self.switch_callback, callback_args=1)
+        # rospy.Subscriber('/switch_2_state', Bool, self.switch_callback, callback_args=2)
+        # rospy.Subscriber('/switch_3_state', Bool, self.switch_callback, callback_args=3)
+        # rospy.Subscriber('/switch_4_state', Bool, self.switch_callback, callback_args=4)
+        # rospy.Subscriber('/switch_5_state', Bool, self.switch_callback, callback_args=5)
+        # rospy.Subscriber('/switch_6_state', Bool, self.switch_callback, callback_args=6)
         
 
         #영상처리

@@ -25,7 +25,7 @@ class Gwiyomi:
         rospy.Subscriber('/joy', Joy, self.joy_callback)
 
         #ros publisher
-        self.llm_emotion = rospy.Publisher('/play_motion_sequence', String, queue_size=10)
+        # self.llm_emotion = rospy.Publisher('/play_motion_sequence', String, queue_size=10)
 
         #Joystick
         # self.prev_buttons = [0] * 10 #Joystick의 버튼의 상태변화를 저장하기 위한 변수
