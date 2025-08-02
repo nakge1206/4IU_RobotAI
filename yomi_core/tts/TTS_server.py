@@ -10,6 +10,7 @@ import numpy as np
 import torch
 import commons
 import utils
+from concurrent.futures import ThreadPoolExecutor
 from models import SynthesizerTrn
 from text.symbols import symbols
 from text import text_to_sequence
@@ -17,25 +18,20 @@ from text import text_to_sequence
 
 class VITS:
     def __init__(self):
-        # 경로를 고정으로 내장
-        checkpoint = r"src/4IU_RobotAI/yomi_core/tts/checkpoints/G_212000.pth"
-        config = r"src/4IU_RobotAI/yomi_core/tts/example/configs/korean.json"
+        checkpoint = "src/4IU_RobotAI/yomi_core/tts/checkpoints/G_212000.pth"
+        config = "src/4IU_RobotAI/yomi_core/tts/example/configs/korean.json"
 
         self.hps = utils.get_hparams_from_file(config)
         self.spk_count = self.hps.data.n_speakers
         self.net_g = SynthesizerTrn(
             len(symbols),
-            self.hps.data.filter_length // 2 + 1,
-            self.hps.train.segment_size // self.hps.data.hop_length,
+            self.hps.data.fin.segment_silter_length // 2 + 1,
+            self.hps.traize // self.hps.data.hop_length,
             n_speakers=self.hps.data.n_speakers,
             **self.hps.model
         ).cuda()
         _ = self.net_g.eval()
         _ = utils.load_checkpoint(checkpoint, self.net_g, None)
-
-        # 서버 자동 실행
-        self.server = TTSServer(self)
-
 
     def get_text(self, text):
         text_norm = text_to_sequence(text, self.hps.data.text_cleaners)
@@ -78,21 +74,27 @@ class TTSHandler:
                 except:
                     pass
             finally:
-                conn.close()
+                try:
+                    conn.shutdown(socket.SHUT_RDWR)
+                except Exception:
+                    pass
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
     def enqueue(self, text, conn):
         self.queue.put((text, conn))
 
 
 class TTSServer:
-    def __init__(self, vits_model, host='127.0.0.1', port=65432):
+    def __init__(self, vits_model, host='127.0.0.1', port=65432, max_workers=10):
         self.host = host
         self.port = port
         self.handler = TTSHandler(vits_model)
-        self.thread = threading.Thread(target=self._run, daemon=True)
-        self.thread.start()
+        self.executor = ThreadPoolExecutor(max_workers=max_workers)
 
-    def _run(self):
+    def run(self):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             s.bind((self.host, self.port))
@@ -100,20 +102,24 @@ class TTSServer:
             print(f"[✓] VITS 서버 실행 중: {self.host}:{self.port}")
             while True:
                 conn, addr = s.accept()
-                threading.Thread(target=self._handle_client, args=(conn, addr), daemon=True).start()
+                self._handle_client(conn, addr)
 
     def _handle_client(self, conn, addr):
         try:
             data = conn.recv(1024)
             if not data:
-                conn.close()
+                print(f"연결 종료됨: {addr}")
                 return
             text = data.decode('utf-8').strip()
             print(f"[요청 수신] {addr}: '{text}'")
             self.handler.enqueue(text, conn)
         except Exception as e:
-            print("[!] 클라이언트 처리 오류:", e)
-            conn.close()
+            print(f"클라이언트 처리 오류 ({addr}):", e)
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 
 class TTSClient:
@@ -139,11 +145,13 @@ class TTSClient:
                     s.sendall(text.encode('utf-8'))
                     result = s.recv(1024).decode()
                     if result.strip() == "done":
-                        print("✅ 재생 완료")
+                        print("재생 완료")
                     if self.on_done:
                         self.on_done()
             except Exception as e:
+                import traceback
                 print("TTSClient 오류:", e)
+                traceback.print_exc()
                 if self.on_done:
                     self.on_done()
 
@@ -152,6 +160,16 @@ class TTSClient:
     def stop(self):
         self.isRunning = False
 
+def run_vits_server():
+    vits_model = VITS()
+    server = TTSServer(vits_model)
+    threading.Thread(target=server.run, daemon=True).start()
+    try:
+        while True:
+            threading.Event().wait(1)
+    except KeyboardInterrupt:
+        print("서버 종료")
 
-# ========== 서버 자동 실행 ==========
-vits = VITS() 
+
+if __name__ == "__main__":
+    run_vits_server()
