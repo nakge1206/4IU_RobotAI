@@ -1,3 +1,4 @@
+# 단독 추론 테스트용
 import os
 import re
 import gc
