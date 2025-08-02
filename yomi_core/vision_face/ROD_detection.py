@@ -17,7 +17,8 @@ class RealtimeObjectDetection:
         model = torch.hub.load( ## 학습된 커스텀 파일 경로
             'ultralytics/yolov5',
             'custom',
-            path='/home/micca/catkin_ws/src/4IU_RobotAI/yomi_core/vision_face/exp7/weights/best.pt'  
+            #path='/home/micca/catkin_ws/src/4IU_RobotAI/yomi_core/vision_face/exp7/weights/best.pt' #ubuntu
+            path='C:/Users/COM/Desktop/yomi/4IU_RobotAI/yomi_core/vision_face/exp7/weights/best.pt' #window
         )
         return model
 
@@ -53,7 +54,9 @@ class RealtimeObjectDetection:
     def plot_boxes(self, detections, frame): # 감지 객체 박스 치는 함수
         for det in detections:
             x1, y1, x2, y2 = det['box']
-            label = det['label']
+            cx = (x1 + x2) // 2
+            cy = (y1 + y2) // 2
+            label = f"{det['label']} {det['confidence']:.2f}%, ({cx}, {cy}) "
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
             cv2.putText(frame, label, (x1, y1 - 10), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
