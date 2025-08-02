@@ -2,16 +2,18 @@
 import asyncio
 import websockets
 
-async def send_text(text):
+async def interactive_mode():
     uri = "ws://172.27.244.83:8765"
     async with websockets.connect(uri) as websocket:
-        await websocket.send(text)
-        result = await websocket.recv()
-        print(f"서버 응답: {result}")
+        while True:
+            text = input("질문 (종료하려면 'ㅂㅂ'): ")
+            if text.lower() in ['ㅂㅂ', 'exit', 'quit']:
+                print("클라이언트 종료.")
+                break
+
+            await websocket.send(text)           # 질문 보냄
+            result = await websocket.recv()      # 응답 받음
+            print(f"로봇 응답: {result}\n")
 
 if __name__ == "__main__":
-    import sys
-    if len(sys.argv) < 2:
-        print("사용법: python inference_client.py \"추론할 텍스트\"")
-    else:
-        asyncio.run(send_text(sys.argv[1]))
+    asyncio.run(interactive_mode())
