@@ -35,7 +35,7 @@ class STTModule:
 
     def micOff(self):
         """ stt 마이크 비활성화 (일시정지)"""
-        print("micOFF")
+        print("[STT] micOFF")
         self.isMic = False
         self.recorder.set_microphone(False)
         
@@ -43,7 +43,7 @@ class STTModule:
     def micOn(self):
         """ stt 마이크 활성화 (제개)"""
         if not self.isMic:
-            print("micON")
+            print("[STT] micON")
             self.recorder.set_microphone(True)
             self.isMic = True
             self._run()
