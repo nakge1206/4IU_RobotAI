@@ -280,9 +280,9 @@ class VisonFaceMain:
             frame, detections = self.yoloWorker._get_latest()
             if frame is not None:
                 if self.viewGUI:
-                    print(detections)
+                    # print(detections)
                     frame = self.yoloWorker.detector.plot_boxes(detections, frame)
-                    #frame = cv2.flip(frame, 1)
+                    frame = cv2.flip(frame, -1)
 
                     if self.isFPS:
                         curr_time = time.time()
