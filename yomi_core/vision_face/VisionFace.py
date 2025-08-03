@@ -47,7 +47,7 @@ class YomiFace(QWidget):
 
         self.movie = QMovie(gif_path)
         if not self.movie.isValid():
-            print(f"[Face_ERROR] GIF 로딩 실패: {gif_path}")
+            print(f"[Face] GIF 로딩 실패: {gif_path}")
             return
 
         from PyQt5.QtCore import QSize
@@ -131,21 +131,22 @@ class FaceController(QObject):
         self.blinking = value
 
     def next_emotion(self):
-        """디버그용도 : space누르면 감정 바뀜"""
+        """디버그용 : 
+            space누르면 감정 바뀜"""
         self.emotion_index = (self.emotion_index + 1) % len(self.emotions)
-        print(f"[Face_Controller] 감정 설정 : {self.emotions[self.emotion_index]}")
+        print(f"[FaceController] 감정 설정 : {self.emotions[self.emotion_index]}")
 
     def set_emotion(self, emotion: str):
         """감정 이름으로 직접 감정을 설정"""
         if emotion in self.emotions:
             self.emotion_index = self.emotions.index(emotion)
-            print(f"[Face_Controller] 감정 설정 : '{emotion}'")
+            print(f"[FaceController] 감정 설정 : '{emotion}'")
         else:
-            print(f"[Face_WARN] Unknown emotion: '{emotion}'")
+            print(f"[FaceController] Unknown emotion: '{emotion}'")
  
     def stop(self):
         #self.timer.stop()
-        print("[Face_Controller] Stopped")
+        print("[FaceController] Stopped")
 
 class YoloWorker(threading.Thread):
     def __init__(self, interval=1.0, isLog=False, on_vision_callback=None):
@@ -164,7 +165,7 @@ class YoloWorker(threading.Thread):
     def run(self):
         cap = cv2.VideoCapture(0)
         if not cap.isOpened():
-            print("[YOLO] 카메라 열기 실패")
+            print("[YoloWorker] 카메라 열기 실패")
             return
         
         last_detection_time = 0
@@ -190,7 +191,7 @@ class YoloWorker(threading.Thread):
         cap.release()
         if self.logger:
             self.logger.save()
-            print("[YOLO] 로그 저장 완료")
+            print("[YoloWorker] 로그 저장 완료")
 
     def stop(self):
         self.running = False
@@ -233,11 +234,12 @@ class VisonFaceMain:
 
     def key_handler(self, event):
         """
-        space - 다음 감정 변환
-        B - 입 뻥긋 활성화
-        Y - 입 뻥긋 비활성화
-        Q - 종료
-        """
+        디버그용 : 
+            space - 다음 감정 변환
+            B - 입 뻥긋 활성화
+            Y - 입 뻥긋 비활성화
+            Q - 종료
+            """
         if event.key() == Qt.Key_Space:
             self.controller.next_emotion()
         elif event.key() == Qt.Key_B:
