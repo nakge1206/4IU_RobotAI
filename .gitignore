@@ -25,6 +25,7 @@ qwen_lora_model/
 gsq_lora_adapter_blossom_backup
 gsq_lora_adapter_koalpaca/
 gsq_lora_beomi7b_out/
+adapter_ax/
 
 #vision
 detections_log.json
