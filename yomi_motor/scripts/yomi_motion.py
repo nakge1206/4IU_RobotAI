@@ -19,14 +19,22 @@ class MotionController:
 
     def ifConflicting(self):
         pass
-    
-    def I_joy1(self):
-        """(좋아하는 것에 대해) 팔을 살랑살랑 움직인다."""
-        # self.executor.request_all_data()
+
+    def defalt_motion(self):
+        "작동 시 처음 해야하는 동작"
         self.executor.motor_publisher_batch(motor_ids=[6], motor_positions=[180], motor_speeds=[5])
         rospy.sleep(0.2)
         self.executor.motor_publisher_batch(motor_ids=[10], motor_positions=[180], motor_speeds=[5])
         rospy.sleep(0.2)
+        self.executor.motor_publisher_batch(motor_ids=[11], motor_positions=[190], motor_speeds=[5])
+        rospy.sleep(0.2)
+        self.executor.motor_publisher_batch(motor_ids=[12], motor_positions=[180], motor_speeds=[5])
+        rospy.sleep(0.2)
+    
+    def I_joy1(self):
+        """(좋아하는 것에 대해) 팔을 살랑살랑 움직인다."""
+        # self.executor.request_all_data()
+        self.defalt_motion()
         self.stand()
         rospy.sleep(0.1)
         for i in range(3):
@@ -64,6 +72,7 @@ class MotionController:
 
     def I_surprise2(self):
         "미세 움직임으로 진동 표현, 떨림 표현"
+        self.defalt_motion()
         self.executor.motor_publisher_batch(motor_ids=[6, 10], motor_positions=[95, 265], motor_speeds=[5])
         rospy.sleep(0.2)
         for i in range(3):
@@ -80,6 +89,7 @@ class MotionController:
 
     def I_sadness2(self):
         "고개를 숙이듯 머리가 아래로 향함"
+        self.defalt_motion()
         self.executor.motor_publisher_batch(motor_ids=[11], motor_positions=[159], motor_speeds=[4])
         rospy.sleep(1.5)
 
@@ -102,6 +112,7 @@ class MotionController:
 
     def I_anger2(self):
         "몸 전체에 진동(가능하면)"
+        self.defalt_motion()
         for i in range(5):
             self.executor.motor_publisher_batch(motor_ids=[6, 10], motor_positions=[95, 265], motor_speeds=[7])
             rospy.sleep(1.5)
@@ -116,6 +127,7 @@ class MotionController:
     
     def I_anticipation3(self):
         "새로운 입력을 기다리는 듯 정지 후 전방 주시" # 팔 내리는거 추가
+        self.defalt_motion()
         self.executor.motor_publisher_batch(motor_ids=[11], motor_positions=[220], motor_speeds=[4])
 
     def E_joy1(self):
@@ -123,6 +135,7 @@ class MotionController:
     
     def E_joy2(self):
         "정위치에서 양손을 든다." # 상황에 맞게 고치기
+        self.defalt_motion()
         self.executor.motor_publisher_batch(motor_ids=[3, 7], motor_positions=[300, 60], motor_speeds=[7])
         rospy.sleep(1.5)
 
@@ -152,6 +165,7 @@ class MotionController:
 
     def E_surprise2(self):
         "미세 움직임으로 진동 표현, 떨림 표현"
+        self.defalt_motion()
         self.executor.motor_publisher_batch(motor_ids=[6, 10], motor_positions=[95, 265], motor_speeds=[5])
         rospy.sleep(0.2)
         for i in range(3):
@@ -168,6 +182,7 @@ class MotionController:
 
     def E_sadness2(self):
         "고개를 숙이듯 머리가 아래로 향함"
+        self.defalt_motion()
         self.executor.motor_publisher_batch(motor_ids=[11], motor_positions=[159], motor_speeds=[4])
         rospy.sleep(1.5)
 
@@ -179,6 +194,7 @@ class MotionController:
 
     def E_disgust2(self):
         "옆으로 돌아서기(고개를 돌리는 것과 같은 효과 일거 같아서 그렇게 만듬)"
+        self.defalt_motion()
         self.executor.motor_publisher_batch(motor_ids=[12], motor_positions=[240], motor_speeds=[4])
         rospy.sleep(1.5)
 
@@ -190,9 +206,12 @@ class MotionController:
 
     def E_anger2(self):
         "몸 전체에 진동(가능하면)"
+        self.defalt_motion()
         for i in range(5):
             self.executor.motor_publisher_batch(motor_ids=[6, 10], motor_positions=[95, 265], motor_speeds=[7])
+            rospy.sleep(1.5)
             self.executor.motor_publisher_batch(motor_ids=[6, 10], motor_positions=[98, 262], motor_speeds=[7])
+            rospy.sleep(1.5)
 
     def E_anger3(self):
         "주변을 빠르게 돌아다닌다"
@@ -205,8 +224,9 @@ class MotionController:
     
     def E_anticipation3(self):
         "새로운 입력을 기다리는 듯 정지 후 전방 주시"
+        self.defalt_motion()
         self.executor.motor_publisher_batch(motor_ids=[11], motor_positions=[220], motor_speeds=[4])
-    
+        rospy.sleep(1.5)
 
     def move_to_greeting_pose(self):
         # 5번 모터 위치로 팔을 올리고 서보로 손 흔들기
@@ -226,30 +246,46 @@ class MotionController:
             self.bow()
             rospy.sleep(2)
             rate.sleep()
+    def run_motion(self, func_name: str):
+        if hasattr(self, func_name):
+            func = getattr(self, func_name)
+            if callable(func):
+                try:
+                    func()
+                except Exception as e:
+                    print(f"[MotionController] '{func_name}' 실행 오류: {e}")
+            else:
+                print(f"[MotionController] '{func_name}'은 호출 불가능한 항목입니다.")
+        else:
+            print(f"[MotionController] 해당 함수 '{func_name}' 존재하지 않음")
 
 if __name__ == '__main__':
+    # 터미널 직접 입력
     # try:
-      #  controller = MotionController()
-      #  controller.I_joy1()
-      #  rospy.spin()
+    #     controller = MotionController()
+    #     while not rospy.is_shutdown():
+    #         func_name = input("함수이름(종료는 end) ")
+    #         if func_name.lower() == 'end':
+    #             break
+    #         elif hasattr(controller, func_name):
+    #             func = getattr(controller, func_name)
+    #             if callable(func):
+    #                 try:
+    #                     func()
+    #                 except Exception as e:
+    #                     print(f"함수 실행 중 오류 발생: {e}")
+    #             else:
+    #                 print("호출 가능한 함수가 아님.")
+    #         else:
+    #             print("해당하는 함수 x")
     # except rospy.ROSInterruptException:
-      #  pass
+    #     pass
     try:
         controller = MotionController()
         while not rospy.is_shutdown():
             func_name = input("함수이름(종료는 end) ")
             if func_name.lower() == 'end':
                 break
-            elif hasattr(controller, func_name):
-                func = getattr(controller, func_name)
-                if callable(func):
-                    try:
-                        func()
-                    except Exception as e:
-                        print(f"함수 실행 중 오류 발생: {e}")
-                else:
-                    print("호출 가능한 함수가 아님.")
-            else:
-                print("해당하는 함수 x")
+            controller.run_motion(func_name)
     except rospy.ROSInterruptException:
         pass
