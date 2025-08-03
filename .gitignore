@@ -8,6 +8,7 @@ __pycache__/
 # environment variables
 .env
 .env.production
+.vscode
 
 # macOS
 .DS_Store
