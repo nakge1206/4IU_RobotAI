@@ -4,6 +4,9 @@ from PyQt5.QtWidgets import QApplication, QLabel, QWidget, QVBoxLayout
 from PyQt5.QtCore import Qt, QTimer, QThread, QObject, pyqtSignal
 from PyQt5.QtGui import QPixmap, QImage, QTransform, QMovie
 
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+
 import cv2
 import threading
 import time
@@ -141,7 +144,7 @@ class FaceController(QObject):
             print(f"[Face_WARN] Unknown emotion: '{emotion}'")
  
     def stop(self):
-        self.timer.stop()
+        #self.timer.stop()
         print("[Face_Controller] Stopped")
 
 class YoloWorker(threading.Thread):
@@ -167,6 +170,7 @@ class YoloWorker(threading.Thread):
         last_detection_time = 0
         while self.running:
             ret, frame = cap.read()
+            #print(frame.shape)
             if not ret:
                 continue
             detection = self.detector.ObjectInfomation(frame)
@@ -193,8 +197,14 @@ class YoloWorker(threading.Thread):
         self.join()
 
     def _get_latest(self):
+        """내부 GUI용 이미지, detection 반환 함수"""
         with self.lock:
             return self.frame.copy() if self.frame is not None else None, self.detections
+    
+    def get_detections(self):
+        """외부에서 감지 결과만 받아갈 때 사용"""
+        with self.lock:
+            return self.detections.copy() if self.detections else []
 
 class VisonFaceMain:
     def __init__(self, interval=1.0, isLog=False, on_vision_callback=None, viewGUI=True, isFPS=False):
@@ -270,8 +280,9 @@ class VisonFaceMain:
             frame, detections = self.yoloWorker._get_latest()
             if frame is not None:
                 if self.viewGUI:
+                    print(detections)
                     frame = self.yoloWorker.detector.plot_boxes(detections, frame)
-                    frame = cv2.flip(frame, -1)
+                    #frame = cv2.flip(frame, 1)
 
                     if self.isFPS:
                         curr_time = time.time()
@@ -295,6 +306,10 @@ class VisonFaceMain:
 
 if __name__ == '__main__':
     main = VisonFaceMain()
-    main.run()
+    try:
+        main.run()
+    except KeyboardInterrupt:
+        main.stop()
+        sys.exit(0)
 
     
