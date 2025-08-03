@@ -104,7 +104,9 @@ class MotionController:
         "몸 전체에 진동(가능하면)"
         for i in range(5):
             self.executor.motor_publisher_batch(motor_ids=[6, 10], motor_positions=[95, 265], motor_speeds=[7])
+            rospy.sleep(1.5)
             self.executor.motor_publisher_batch(motor_ids=[6, 10], motor_positions=[98, 262], motor_speeds=[7])
+            rospy.sleep(1.5)
 
     def I_anticipation1(self):
         "주변을 돌아다닌다"
@@ -113,14 +115,14 @@ class MotionController:
         "바퀴로 자리에서 빙글빙글 천천히 돈다"
     
     def I_anticipation3(self):
-        "새로운 입력을 기다리는 듯 정지 후 전방 주시"
+        "새로운 입력을 기다리는 듯 정지 후 전방 주시" # 팔 내리는거 추가
         self.executor.motor_publisher_batch(motor_ids=[11], motor_positions=[220], motor_speeds=[4])
 
     def E_joy1(self):
         "/(행위가 끝난뒤) 크게 공간을 한바퀴 돌며 정해진 위치로 돌아감"
     
     def E_joy2(self):
-        "정위치에서 양손을 든다."
+        "정위치에서 양손을 든다." # 상황에 맞게 고치기
         self.executor.motor_publisher_batch(motor_ids=[3, 7], motor_positions=[300, 60], motor_speeds=[7])
         rospy.sleep(1.5)
 
