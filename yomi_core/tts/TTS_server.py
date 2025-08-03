@@ -6,32 +6,41 @@ import threading
 from queue import Queue
 import simpleaudio as sa
 import numpy as np
-
+import sounddevice as sd
 import torch
 import commons
-import utils
+import util
 from concurrent.futures import ThreadPoolExecutor
-from models import SynthesizerTrn
+from model import SynthesizerTrn
 from text.symbols import symbols
 from text import text_to_sequence
 
 
+def play_audio(audio, rate):
+    sd.play(audio, samplerate=rate)
+    sd.wait()
+
 class VITS:
     def __init__(self):
-        checkpoint = "src/4IU_RobotAI/yomi_core/tts/checkpoints/G_212000.pth"
-        config = "src/4IU_RobotAI/yomi_core/tts/example/configs/korean.json"
+        checkpoint = "/home/micca/catkin_ws/src/4IU_RobotAI/yomi_core/tts/checkpoints/G_212000.pth"
+        config = "/home/micca/catkin_ws/src/4IU_RobotAI/yomi_core/tts/example/configs/korean.json"
 
-        self.hps = utils.get_hparams_from_file(config)
+        self.device = torch.device("cuda")  # ✅ 강제로 GPU 지정
+        
+        print("TTSModel using device : ", self.device)
+
+        self.hps = util.get_hparams_from_file(config)
         self.spk_count = self.hps.data.n_speakers
         self.net_g = SynthesizerTrn(
             len(symbols),
-            self.hps.data.fin.segment_silter_length // 2 + 1,
-            self.hps.traize // self.hps.data.hop_length,
+            self.hps.data.filter_length // 2 + 1,
+            self.hps.train.segment_size // self.hps.data.hop_length,
             n_speakers=self.hps.data.n_speakers,
             **self.hps.model
-        ).cuda()
+        ).to(self.device)  # ✅ 모델을 GPU에 강제 업로드
+
         _ = self.net_g.eval()
-        _ = utils.load_checkpoint(checkpoint, self.net_g, None)
+        _ = util.load_checkpoint(checkpoint, self.net_g, None)
 
     def get_text(self, text):
         text_norm = text_to_sequence(text, self.hps.data.text_cleaners)
@@ -42,14 +51,19 @@ class VITS:
     def infer(self, text, spk_id=0):
         stn_tst = self.get_text(text)
         with torch.no_grad():
-            x_tst = stn_tst.cuda().unsqueeze(0)
-            x_tst_lengths = torch.LongTensor([stn_tst.size(0)]).cuda()
-            sid = torch.LongTensor([spk_id]).cuda()
+            x_tst = stn_tst.to(self.device).unsqueeze(0)  # ✅ GPU에 올림
+            x_tst_lengths = torch.LongTensor([stn_tst.size(0)]).to(self.device)
+            sid = torch.LongTensor([spk_id]).to(self.device)
+
+            print("[디버그] 디바이스 상태:", x_tst.device, x_tst_lengths.device, sid.device)
+
             audio = self.net_g.infer(
                 x_tst, x_tst_lengths, sid=sid,
                 noise_scale=.667, noise_scale_w=0.8, length_scale=1
-            )[0][0, 0].data.cpu().float().numpy()
+            )[0][0, 0].data.cpu().float().numpy()  # ✅ 결과만 CPU로 이동
+
         return audio
+
 
 
 class TTSHandler:
@@ -64,8 +78,8 @@ class TTSHandler:
             try:
                 audio = self.vits.infer(text)
                 audio_int16 = np.int16(audio * 32767)
-                play_obj = sa.play_buffer(audio_int16, 1, 2, self.vits.hps.data.sampling_rate)
-                play_obj.wait_done()
+                sd.play(audio_int16, samplerate=self.vits.hps.data.sampling_rate)
+                sd.wait()
                 conn.sendall(b"done")
             except Exception as e:
                 print("[TTS 처리 오류]:", e)
@@ -99,7 +113,7 @@ class TTSServer:
             s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             s.bind((self.host, self.port))
             s.listen()
-            print(f"[✓] VITS 서버 실행 중: {self.host}:{self.port}")
+            # print(f"[✓] VITS 서버 실행 중: {self.host}:{self.port}")
             while True:
                 conn, addr = s.accept()
                 self._handle_client(conn, addr)
@@ -109,13 +123,13 @@ class TTSServer:
             data = conn.recv(1024)
             if not data:
                 print(f"연결 종료됨: {addr}")
+                conn.close()
                 return
             text = data.decode('utf-8').strip()
             print(f"[요청 수신] {addr}: '{text}'")
             self.handler.enqueue(text, conn)
         except Exception as e:
             print(f"클라이언트 처리 오류 ({addr}):", e)
-        finally:
             try:
                 conn.close()
             except Exception:

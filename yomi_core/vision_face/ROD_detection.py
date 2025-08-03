@@ -10,10 +10,11 @@ class RealtimeObjectDetection:
         self.classes = self.model.names # 객체 이름 변환
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu' # 사용할 장치 선택 cuda면 cuda 안 되면 cpu로
         self.all_detections = []  # 감지 객체 리스트 변환
-        print(f"Using device: {self.device}") 
+        print(f"Yolo using device: {self.device}") 
 
     def load_model(self): # 학습된 데이터 셋 불러오는 함수
-        model = torch.hub.load('ultralytics/yolov5', 'yolov5s', pretrained=True) # yolov5에 어떤 dataset을 쓸건지
+        # model = torch.hub.load('ultralytics/yolov5', 'yolov5s', pretrained=True) # yolov5에 어떤 dataset을 쓸건지
+        
         model = torch.hub.load( ## 학습된 커스텀 파일 경로
             'ultralytics/yolov5',
             'custom',

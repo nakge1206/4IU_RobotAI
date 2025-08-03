@@ -20,10 +20,10 @@ sys.path.append(os.path.abspath('./yomi_motor/scripts'))
 # 각 모듈 임포트
 from stt.realtime_stt_module import STTModule #STT
 # from robot_core.inference_koalpaca_12B import LLMResponder
-# from tts.TTS_server import TTSServer, TTSClient
+from tts.TTS_server import TTSServer, VITS, TTSClient
 from vision_face.VisionFace import VisonFaceMain #Vision
 from llm_core.gpt_fine_tuning_model import FineTunedGPTClient #GPT LLM
-from yomi_motor.scripts.yomi_motor import MotionSequenceExecutor
+# from yomi_motor import MotionSequenceExecutor
 
 
 class Yomi:
@@ -36,7 +36,7 @@ class Yomi:
         self.isTTS = isTTS
         self.isLLM = isLLM
         self.isVisionFace = isVisionFace
-
+        
         #조이스틱 제어 플래그
         self.joy_master_flag = True
 
@@ -47,13 +47,13 @@ class Yomi:
         #모듈 초기화
         self.stt = STTModule(on_text_callback=self.handle_stt) if isSTT else None
         print(f"STT : 준비완료 ({isSTT})")
-        # self.tts_server = TTSServer()
-        print(f"TTSServer : 준비완료 ({isTTS})")
-        # threading.Thread(target=self.tts_server._run, daemon=True).start()
-        # self.tts = TTSClient(on_done=self.done_tts, on_start=self.start_tts) if isTTS else None  # TTS 사용 시
+        if isTTS:
+            self.vits_model = VITS()
+            self.tts_server = TTSServer(self.vits_model)
+            print(f"TTSServer : 준비완료 ({isTTS})")
+        self.tts = TTSClient(on_done=self.on_tts_done, on_start=self.on_tts_start) if isTTS else None
         print(f"TTSClient : 준비완료 ({isTTS})")
-        # self.llm = LLMResponder() if isLLM else None
-        self.llm = FineTunedGPTClient() if isLLM else None # gpt 사용시
+        # self.llm = FineTunedGPTClient() if isLLM else None
         print(f"LLM : 준비완료 ({isLLM})")
         self.VisionFace = VisonFaceMain(interval=2, on_vision_callback=self.handle_vision, viewGUI=True) if isVisionFace else None
         print(f"VisionFace : 준비완료 ({isVisionFace})")
@@ -78,8 +78,7 @@ class Yomi:
         if self.isSTT:
             threading.Thread(target=self.sttStart, daemon=True).start()
         if self.isTTS:
-            pass
-            # self.tts.connect() 
+            threading.Thread(target=self.tts_server.run, daemon=True).start()
         if self.isVisionFace:
             self.VisionFace.run()
 
@@ -100,22 +99,29 @@ class Yomi:
             self.resume()
 
     def pause(self):
-        """"STT 및 Vision 일시정지"""
+        """"STT 마이크 비활성화"""
         if self.isSTT:
             self.stt.micOff()
         # self.isVision=False
 
     def resume(self):
+        """STT 마이크 활성화"""
         if self.joy_master_flag and not self.is_tts_running and self.isSTT:
             self.stt.micOn()
             
         # self.isVision=True
     
     def handle_stt(self, stt_texts):
+        # print("[handle_stt] STT 결과 수신:", stt_texts)
         """STT발생 시 처리 함수"""
-        self.is_tts_running = True
+        # self.is_tts_running = True
         self.pause()   
-
+        stt_text, stt_info = stt_texts
+        if self.tts:
+            print("[handle_stt] 직접 TTS 전송 호출")
+            self.try_send_tts(stt_text)
+        else:
+            print("[handle_stt] self.tts가 None입니다.")
         #타이머
         if self.sttTimer:
             self.sttTimer.cancel()
@@ -130,23 +136,23 @@ class Yomi:
             print(f"LLM 처리 중 오류 발생 : {e}")
             
 
-    def handle_vision(self, visionText):
+    def handle_vision(self, visionText=None):
         """STT N초 이상 안들어오면 vision 정보 활용"""
-        # if self.joy_master_flag and self.isVision:
-        #     self.lastVision = visionText
-        #     labels = [item['label'] for item in self.lastVision] if self.lastVision else None
-        #     print(labels)
-        #     # if random.random() < 0.1:
-        #     #     self.llm_promt(None, labels, False, True)
+        if self.joy_master_flag and self.isVisionFace:
+            self.lastVision = visionText
+            # labels = [item['label'] for item in self.lastVision] if self.lastVision else None
+            # print(self.lastVision)
+            # if random.random() < 0.1:
+            #     self.llm_promt(None, labels, False, True)
 
     def llm_promt(self, sttTexts, visionText):
         if not self.isLLM:
             self.is_tts_running = False
             self.resume()
             if self.tts: #근데 tts는 켜져있을 때
-                if sttTexts:
-                    pass
-                    # self.tts.send_text(sttTexts[0])
+                stt_text, _ = sttTexts
+                print("[llm_promt] LLM OFF 상태, TTS 전송 시도")
+                self.try_send_tts(stt_text)
             return
 
         if self.isSTT and self.isVision: #STT가 들어올때(영상정보까지 포함됨).
@@ -262,6 +268,7 @@ class Yomi:
         self.tts_state.publish(False)
 
     def try_send_tts(self, response_text):
+        print(f"[try_send_tts 호출됨] text: {response_text}")
         """TTS 상태 확인 후 텍스트 전송"""
         if self.tts and not self.is_tts_running:
             self.is_tts_running = True
@@ -280,6 +287,7 @@ class Yomi:
         """TTS가 끝날 때 호출되는 콜백 함수"""
         self.done_tts_publish()
         self.is_tts_running = False
+        # self.resume()
 
 
 
@@ -298,7 +306,7 @@ class Yomi:
 
 
 if __name__ == "__main__":
-    service = Yomi(isSTT=True, isLLM=True, isTTS=True, isVisionFace=False)
+    service = Yomi(isSTT=True, isLLM=False, isTTS=True, isVisionFace=True)
 
     service.start()
 
