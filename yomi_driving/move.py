@@ -9,15 +9,16 @@ import actionlib
 # 전역 변수
 latest_scan = None
 robot_pose = {"x": 0.0, "y": 0.0, "yaw": 0.0}
+is_moving = False
+move_base_client = None  # 🔧 전역 클라이언트 객체
 
-# 1. LaserScan 콜백
+# LaserScan 콜백
 def scan_callback(msg):
     global latest_scan
     latest_scan = msg
 
-# 2. 가장 가까운 장애물의 각도(도)와 거리(m)를 반환
+# 장애물 탐지
 def get_obstacle_angle(threshold=1.0):
-    # param threshold: 거리 제한 (m)
     if latest_scan is None:
         return None
 
@@ -38,10 +39,9 @@ def get_obstacle_angle(threshold=1.0):
 
     if obstacle_angle is not None:
         return (obstacle_angle, min_distance)
-    else:
-        return None
+    return None
 
-# 3. Odometry 콜백
+# Odometry 콜백
 def odom_callback(msg):
     global robot_pose
     robot_pose["x"] = msg.pose.pose.position.x
@@ -53,21 +53,16 @@ def odom_callback(msg):
     ])
     robot_pose["yaw"] = yaw
 
-# 4. 현재 위치 기준 목표 좌표 계산
+# 목표 좌표 계산
 def calculate_target_position(angle_deg, distance):
-    # angle_deg: 장애물 방향 (도)
-    # distance: 이동 거리 (m)
-    # return: (target_x, target_y)
     total_angle_rad = robot_pose["yaw"] + math.radians(angle_deg)
     target_x = robot_pose["x"] + math.cos(total_angle_rad) * distance
     target_y = robot_pose["y"] + math.sin(total_angle_rad) * distance
     return (target_x, target_y)
 
-# 5. 목표 위치로 이동
+# 목표 위치로 이동
 def move_to_goal(x, y):
-    client = actionlib.SimpleActionClient('move_base', MoveBaseAction)
-    rospy.loginfo("move_base 서버 대기 중")
-    client.wait_for_server()
+    global is_moving, move_base_client
 
     goal = MoveBaseGoal()
     goal.target_pose.header.frame_id = "map"
@@ -77,35 +72,52 @@ def move_to_goal(x, y):
     goal.target_pose.pose.orientation.w = 1.0
 
     rospy.loginfo(f"[→] 목표 좌표: ({x:.2f}, {y:.2f})")
-    client.send_goal(goal)
-    client.wait_for_result()
+    is_moving = True
+    move_base_client.send_goal(goal)
+    move_base_client.wait_for_result()
+    is_moving = False
 
-    result = client.get_result()
+    result = move_base_client.get_result()
     if result:
         rospy.loginfo("이동 성공")
     else:
         rospy.logwarn("이동 실패 또는 취소됨")
 
-# 6. 전체 제어 흐름
-def main():
-    rospy.init_node("go_to_obstacle_node")
-    rospy.Subscriber("/scan", LaserScan, scan_callback)
-    rospy.Subscriber("/odom", Odometry, odom_callback)
-
-    rospy.sleep(2.0)  # 초기 센서 수신 대기
+# 5초마다 실행될 함수
+def check_and_move(event):
+    global is_moving
+    if is_moving:
+        rospy.loginfo("현재 이동 중입니다. 스킵합니다.")
+        return
 
     result = get_obstacle_angle(threshold=1.5)
     if result is None:
-        rospy.logwarn("감지된 장애물이 없습니다.")
+        rospy.loginfo("[⏳] 감지된 장애물이 없습니다.")
         return
 
     angle_deg, distance = result
     rospy.loginfo(f"[i] 장애물 방향: {angle_deg:.1f}도, 거리: {distance:.2f}m")
 
-    # 최소 안전 거리 확보
     approach_distance = max(0.2, distance - 0.3)
     target_x, target_y = calculate_target_position(angle_deg, approach_distance)
     move_to_goal(target_x, target_y)
+
+# 메인 함수
+def main():
+    global move_base_client
+    rospy.init_node("go_to_obstacle_node")
+    rospy.Subscriber("/scan", LaserScan, scan_callback)
+    rospy.Subscriber("/odom", Odometry, odom_callback)
+
+    # move_base 클라이언트 초기화
+    move_base_client = actionlib.SimpleActionClient('move_base', MoveBaseAction)
+    rospy.loginfo("move_base 서버 대기 중...")
+    move_base_client.wait_for_server()
+    rospy.loginfo("move_base 연결 완료.")
+
+    rospy.sleep(2.0)  # 초기 센서 수신 대기
+    rospy.Timer(rospy.Duration(5.0), check_and_move)
+    rospy.spin()
 
 if __name__ == "__main__":
     try:
