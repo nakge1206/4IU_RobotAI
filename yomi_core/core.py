@@ -6,6 +6,7 @@ import random
 import time
 
 import logging
+import asyncio
 
 #ros통신용
 import rospy, rosgraph
@@ -99,7 +100,6 @@ class Yomi:
         if self.isTTS:
             threading.Thread(target=self.tts_server.run, daemon=True).start()
         if self.isLLM:
-            #todo : 이거 오류날 가능성 매우 높음
             threading.Thread(target=self.llm.connect, daemon=True).start()
         if self.isVisionFace:
             self.VisionFace.run()
@@ -192,7 +192,7 @@ class Yomi:
                 print(f"[YOMI] (handle_switch) 알 수 없는 switch 값: {index}")
     
     def handle_llm(self, text):
-        responseAndEmotion = self.llm.send(text)
+        responseAndEmotion = asyncio.self.llm.send(text)
         if self.isTTS:
             self.try_send_tts(responseAndEmotion)
 
@@ -223,7 +223,7 @@ class Yomi:
     def make_yolo_prompt(self):
         """이미지 정보를 문자열로"""
         if not self.lastVision:
-            return None
+            return "감지된 객체가 없습니다."
         
         result = []
         for item in self.lastVision:
@@ -235,7 +235,7 @@ class Yomi:
         return ', '.join(result)
 
 if __name__ == "__main__":
-    service = Yomi(isSTT=True, isLLM=False, isTTS=True, isVisionFace=True)
+    service = Yomi(isSTT=True, isLLM=True, isTTS=True, isVisionFace=True)
 
     service.start()
 
