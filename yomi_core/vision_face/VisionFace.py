@@ -1,15 +1,21 @@
+# 기본 패키지
 import os
 import sys
+import threading
+import time
+
+# Face 패키지
 from PyQt5.QtWidgets import QApplication, QLabel, QWidget, QVBoxLayout
-from PyQt5.QtCore import Qt, QTimer, QThread, QObject, pyqtSignal
-from PyQt5.QtGui import QPixmap, QImage, QTransform, QMovie
+from PyQt5.QtCore import Qt, QThread, QObject, pyqtSignal, QTimer
+from PyQt5.QtGui import QPixmap, QMovie
+import rospy
+from std_msgs.msg import Bool
 
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 
+# Vision 패키지
 import cv2
-import threading
-import time
 from ROD_detection import RealtimeObjectDetection
 from ROD_log import DetectionLogger
 
@@ -47,7 +53,7 @@ class YomiFace(QWidget):
 
         self.movie = QMovie(gif_path)
         if not self.movie.isValid():
-            print(f"[Face] GIF 로딩 실패: {gif_path}")
+            print(f"[VisionFace] [YomiFace] GIF 로딩 실패: {gif_path}")
             return
 
         from PyQt5.QtCore import QSize
@@ -63,90 +69,101 @@ class YomiFace(QWidget):
 
 
 class FaceController(QObject):
-    def __init__(self):
+
+    def __init__(self, mbti = "I"):
         super().__init__()
         self.gui = None  # GUI 객체를 받아서 제어
+        self.mbti = mbti
 
         self.emotions = ["joy", "sadness", "angry", "fear", "surprise", "disgust", "trust", "anticipation"]
         self.emotion_index = 0
-        self.blinking = False
-        self.img_index = 0
 
         self.script_dir = os.path.dirname(os.path.abspath(__file__))
         self.image_paths = self._load_image_paths()
-        self.scaled_cache = {}
+
+        self.tts_state = False
+        self.no_face_trigger_time = None
+        if not rospy.core.is_initialized():
+            rospy.init_node('vision_face_node', anonymous=True)
+        rospy.Subscriber("/tts_state", Bool, self.handle_tts)
+        
 
     def initialize(self, gui):
         self.gui = gui
-        self.gui.set_emotion_movie(self.image_paths)
-        # self.timer = QTimer()
-        # self.timer.setInterval(100)
-        # self.timer.timeout.connect(self.update_emotion)
-        # self.timer.start()
+        current_emotion = self.emotions[self.emotion_index]
+
+        self.gui.set_emotion_movie(self.image_paths[current_emotion])
 
     def _load_image_paths(self):
         """감정에 맞는 이미지 경로 찾기"""
-        base = os.path.join(self.script_dir, 'blackface')
-        return os.path.join(base, 'yomi_1.gif')
-        # return {
-        #     emotion: (
-        #         os.path.join(base, f'black_{emotion}D.png'),
-        #         os.path.join(base, f'black_{emotion}S.png')
-        #     ) for emotion in self.emotions
-        # }
-
-    # def update_emotion(self):
-    #     """현재 감정에 따라 GUI업데이트"""
-    #     if self.blinking:
-    #         self.img_index = (self.img_index + 1) % 2
-    #     else:
-    #         self.img_index = 0
-
-    #     emotion = self.emotions[self.emotion_index]
-    #     cache_key = (emotion, self.img_index)
-
-    #     if cache_key in self.scaled_cache:
-    #         pixmap = self.scaled_cache[cache_key]
-    #     else:
-    #         path = self.image_paths[emotion][self.img_index]
-    #         path = self.image_paths
-    #         pixmap = QPixmap(path)
-    #         if pixmap.isNull():
-    #             print(f"[Face_ERROR] 이미지 불러오기 실패 : {path}")
-    #             return
-    #         pixmap = pixmap.scaled(
-    #             self.gui.width(), self.gui.height(),
-    #             Qt.IgnoreAspectRatio, Qt.SmoothTransformation
-    #         )
-    #         self.scaled_cache[cache_key] = pixmap
-
-    #     self.gui.set_emotion_pixmap(pixmap)
-
+        base = os.path.join(self.script_dir, 'face')
+        paths = {}
+        for emotion in self.emotions:
+            gif_path = os.path.join(base, f"{self.mbti}_{emotion}.gif")
+            if not os.path.exists(gif_path):
+                print(f"[VisionFace] [FaceController] (_load_image_paths) 경고 : {gif_path} 파일 없음")
+            paths[emotion] = gif_path
+        return paths
+    
     def update_emotion(self):
-        """단일 GIF 애니메이션 디버깅"""
-        pass
-
-    def set_blinking(self, value: bool):
-        """입 움직이는지 설정"""
-        self.blinking = value
-
-    def next_emotion(self):
-        """디버그용 : 
-            space누르면 감정 바뀜"""
-        self.emotion_index = (self.emotion_index + 1) % len(self.emotions)
-        print(f"[FaceController] 감정 설정 : {self.emotions[self.emotion_index]}")
+        """현재 감정에 따라 GUI업데이트"""
+        current_emotion = self.emotions[self.emotion_index]
+        gif_path = self.image_paths.get(current_emotion)
+        if gif_path and os.path.exists(gif_path):
+            self.gui.set_emotion_movie(gif_path)
+        else:
+            print(f"[VisionFace] [FaceController] (update_emotion) GIF 없음: {gif_path}")
 
     def set_emotion(self, emotion: str):
         """감정 이름으로 직접 감정을 설정"""
         if emotion in self.emotions:
             self.emotion_index = self.emotions.index(emotion)
-            print(f"[FaceController] 감정 설정 : '{emotion}'")
+            print(f"[VisionFace] [FaceController] (set_emotion) 감정 설정 : '{emotion}'")
         else:
-            print(f"[FaceController] Unknown emotion: '{emotion}'")
- 
-    def stop(self):
-        #self.timer.stop()
-        print("[FaceController] Stopped")
+            print(f"[VisionFace] [FaceController] (set_emotion) Unknown emotion: '{emotion}'")
+        self.update_emotion()
+    
+    def handle_tts(self, msg):
+        """rostopic(stt_state) 감지해서 True->False일때 실행"""
+        print(f"[VisionFace] [FaceController] (handle_tts) tts변화 감지함 : {msg.data}")
+        if self.tts_state and not msg.data:
+            self.no_face_trigger_time = time.time() + 3
+        self.tts_state = msg.data
+
+    def check_no_face(self):
+        """무표정트리커 활성화 되면, 3초후 출력"""
+        if self.no_face_trigger_time and time.time() >= self.no_face_trigger_time:
+            self.no_face_trigger_time = None
+            gif_path = os.path.join(self.script_dir, 'face', f"{self.mbti}_no.gif")
+            if os.path.exists(gif_path) and self.gui:
+                self.gui.set_emotion_movie(gif_path)
+                print("[VisionFace] [FaceController] (handle_tts) 감정 설정 : 무표정")
+    
+    # def _delayed_no_face(self):
+    #     """TTS가 완료되고 나서, 3초 후 무표정 실행"""
+    #     gif_path = os.path.join(self.script_dir, 'face', f"{self.mbti}_no.gif")
+    #     if os.path.exists(gif_path) and self.gui:
+    #         self.gui.set_emotion_movie(gif_path)
+    #         self.update_emotion()
+    #         print(f"[VisionFace] [FaceController] (handle_tts) 감정 설정 : 무표정")
+    #     else:
+    #         print(f"[VisionFace] [FaceController] 무표정 파일 없음: {gif_path}")
+
+    def next_emotion(self):
+        """디버그용 : 
+            space누르면 감정 바뀜"""
+        self.emotion_index = (self.emotion_index + 1) % len(self.emotions)
+        self.update_emotion()
+        print(f"[VisionFace] [FaceController] (next_emotion) 감정 설정 : {self.emotions[self.emotion_index]}")
+    
+    def next_mbti(self):
+        """디버그용 : 
+            M누르면 mbti 바뀜"""
+        self.mbti = "E" if self.mbti == "I" else "I"
+        self.image_paths = self._load_image_paths()
+        self.update_emotion()
+        print(f"[VisionFace] [FaceController] (next_mbti) mbti 설정 : {self.emotions[self.emotion_index]}")
+
 
 class YoloWorker(threading.Thread):
     def __init__(self, interval=1.0, isLog=False, on_vision_callback=None):
@@ -165,7 +182,7 @@ class YoloWorker(threading.Thread):
     def run(self):
         cap = cv2.VideoCapture(0)
         if not cap.isOpened():
-            print("[YoloWorker] 카메라 열기 실패")
+            print("[VisionFace] [YoloWorker] 카메라 열기 실패")
             return
         
         last_detection_time = 0
@@ -191,9 +208,10 @@ class YoloWorker(threading.Thread):
         cap.release()
         if self.logger:
             self.logger.save()
-            print("[YoloWorker] 로그 저장 완료")
+            print("[VisionFace] [YoloWorker] 로그 저장 완료")
 
     def stop(self):
+        print("[VisionFace] [YoloWorker] YoloWorker 종료")
         self.running = False
         self.join()
 
@@ -208,7 +226,7 @@ class YoloWorker(threading.Thread):
             return self.detections.copy() if self.detections else []
 
 class VisonFaceMain:
-    def __init__(self, interval=1.0, isLog=False, on_vision_callback=None, viewGUI=True, isFPS=False):
+    def __init__(self, interval=1.0, isLog=False, on_vision_callback=None, viewGUI=True, isFPS=False, mbti="I"):
         self.app = QApplication(sys.argv)
 
         # Face UI 및 제어
@@ -216,7 +234,7 @@ class VisonFaceMain:
         self.face.show()
 
         self.controller_thread = QThread()
-        self.controller = FaceController()
+        self.controller = FaceController(mbti)
         self.controller.moveToThread(self.controller_thread)
         self.controller_thread.started.connect(lambda: self.controller.initialize(self.face))
         self.controller_thread.start()
@@ -236,16 +254,13 @@ class VisonFaceMain:
         """
         디버그용 : 
             space - 다음 감정 변환
-            B - 입 뻥긋 활성화
-            Y - 입 뻥긋 비활성화
+            M - E <-> I 변경
             Q - 종료
             """
         if event.key() == Qt.Key_Space:
             self.controller.next_emotion()
-        elif event.key() == Qt.Key_B:
-            self.controller.set_blinking(True)
-        elif event.key() == Qt.Key_Y:
-            self.controller.set_blinking(False)
+        elif event.key() == Qt.Key_M:
+            self.controller.next_mbti()
         elif event.key() == Qt.Key_Q:
             self.running = False
             self.app.quit()
@@ -253,7 +268,6 @@ class VisonFaceMain:
     def _quit(self):
         """내부 종료문"""
         self.yoloWorker.stop()
-        self.controller.stop()
         self.controller_thread.quit()
         self.controller_thread.wait()
         if self.viewGUI:
@@ -261,16 +275,13 @@ class VisonFaceMain:
 
     def stop(self):
         """VisionFace 전체 종료"""
+        print("[VisionFace] [VisionFaceMain] 모듈 종료")
         self.running = False
         self.app.quit()
 
     def vision_get_detections(self):
         """현재 탐지한 객체 받아오기"""
         return self.yoloWorker.detections
-
-    def face_set_blinking(self, value: bool):
-        """입 움직이는지 설정"""
-        self.controller.set_blinking(value)
 
     def face_set_emotion(self, emotion: str):
         """감정 변경"""
@@ -299,6 +310,7 @@ class VisonFaceMain:
                         break
             
             #PyQt 실행 함수
+            self.controller.check_no_face()
             self.app.processEvents()
 
         self._quit()
@@ -307,7 +319,7 @@ class VisonFaceMain:
 
 
 if __name__ == '__main__':
-    main = VisonFaceMain()
+    main = VisonFaceMain(mbti="I")
     try:
         main.run()
     except KeyboardInterrupt:
