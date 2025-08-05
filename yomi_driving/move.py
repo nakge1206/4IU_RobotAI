@@ -10,38 +10,18 @@ import actionlib
 latest_scan = None
 robot_pose = {"x": 0.0, "y": 0.0, "yaw": 0.0}
 is_moving = False
-move_base_client = None  # 🔧 전역 클라이언트 객체
+move_base_client = None  # MoveBase 액션 클라이언트
 
-# LaserScan 콜백
+# ─────────────────────────────
+# [1] LaserScan 콜백
+# ─────────────────────────────
 def scan_callback(msg):
     global latest_scan
     latest_scan = msg
 
-# 장애물 탐지
-def get_obstacle_angle(threshold=1.0):
-    if latest_scan is None:
-        return None
-
-    ranges = latest_scan.ranges
-    angle_min = latest_scan.angle_min
-    angle_increment = latest_scan.angle_increment
-
-    min_distance = float('inf')
-    obstacle_angle = None
-
-    for i, r in enumerate(ranges):
-        if math.isinf(r) or r < 0.1 or r >= threshold:
-            continue
-        angle = angle_min + i * angle_increment
-        if r < min_distance:
-            min_distance = r
-            obstacle_angle = math.degrees(angle)
-
-    if obstacle_angle is not None:
-        return (obstacle_angle, min_distance)
-    return None
-
-# Odometry 콜백
+# ─────────────────────────────
+# [2] Odometry 콜백 → 로봇 위치 저장
+# ─────────────────────────────
 def odom_callback(msg):
     global robot_pose
     robot_pose["x"] = msg.pose.pose.position.x
@@ -53,14 +33,75 @@ def odom_callback(msg):
     ])
     robot_pose["yaw"] = yaw
 
-# 목표 좌표 계산
-def calculate_target_position(angle_deg, distance):
-    total_angle_rad = robot_pose["yaw"] + math.radians(angle_deg)
-    target_x = robot_pose["x"] + math.cos(total_angle_rad) * distance
-    target_y = robot_pose["y"] + math.sin(total_angle_rad) * distance
-    return (target_x, target_y)
+# ─────────────────────────────
+# [3] 가장 가까운 장애물의 전역 위치 계산
+# ─────────────────────────────
+def get_obstacle_position(threshold=1.5):
+    if latest_scan is None:
+        return None
 
-# 목표 위치로 이동
+    ranges = latest_scan.ranges
+    angle_min = latest_scan.angle_min
+    angle_increment = latest_scan.angle_increment
+
+    min_distance = float('inf')
+    best_angle = None
+
+    for i, r in enumerate(ranges):
+        if math.isinf(r) or r < 0.1 or r >= threshold:
+            continue
+        angle = angle_min + i * angle_increment
+        if r < min_distance:
+            min_distance = r
+            best_angle = angle
+
+    if best_angle is None:
+        return None
+
+    total_angle = robot_pose["yaw"] + best_angle
+    obs_x = robot_pose["x"] + math.cos(total_angle) * min_distance
+    obs_y = robot_pose["y"] + math.sin(total_angle) * min_distance
+    return (obs_x, obs_y)
+
+# ─────────────────────────────
+# [4] 장애물 기준 상대 방향 위치 계산 (벡터 방식)
+# ─────────────────────────────
+def get_relative_position(obs_x, obs_y, offset=0.5, direction="left"):
+    """
+    장애물 기준 상대 위치 계산: 좌/우/뒤/앞 방향
+    direction: "left", "right", "back", "front"
+    """
+    dx = obs_x - robot_pose["x"]
+    dy = obs_y - robot_pose["y"]
+    dist = math.hypot(dx, dy)
+
+    if dist == 0:
+        rospy.logwarn("로봇과 장애물 위치가 같습니다.")
+        return obs_x, obs_y
+
+    # 로봇 → 장애물 방향 단위 벡터
+    ux = dx / dist
+    uy = dy / dist
+
+    # 방향 벡터 선택
+    if direction == "front":
+        vx, vy = ux, uy
+    elif direction == "back":
+        vx, vy = -ux, -uy
+    elif direction == "left":
+        vx, vy = -uy, ux
+    elif direction == "right":
+        vx, vy = uy, -ux
+    else:
+        raise ValueError("direction must be one of: front, back, left, right")
+
+    target_x = obs_x + vx * offset
+    target_y = obs_y + vy * offset
+    return target_x, target_y
+
+# ─────────────────────────────
+# [5] 목표 위치로 이동
+# ─────────────────────────────
 def move_to_goal(x, y):
     global is_moving, move_base_client
 
@@ -83,39 +124,46 @@ def move_to_goal(x, y):
     else:
         rospy.logwarn("이동 실패 또는 취소됨")
 
-# 5초마다 실행될 함수
+# ─────────────────────────────
+# [6] 주기적 실행: 장애물 탐지 → 상대 위치로 이동
+# ─────────────────────────────
 def check_and_move(event):
     global is_moving
     if is_moving:
-        rospy.loginfo("현재 이동 중입니다. 스킵합니다.")
+        rospy.loginfo("이동 중. 이번 루프는 스킵.")
         return
 
-    result = get_obstacle_angle(threshold=1.5)
-    if result is None:
-        rospy.loginfo("[⏳] 감지된 장애물이 없습니다.")
+    obs = get_obstacle_position(threshold=1.5)
+    if obs is None:
+        rospy.loginfo("장애물 없음")
         return
 
-    angle_deg, distance = result
-    rospy.loginfo(f"[i] 장애물 방향: {angle_deg:.1f}도, 거리: {distance:.2f}m")
+    obs_x, obs_y = obs
+    rospy.loginfo(f"[i] 장애물 좌표: ({obs_x:.2f}, {obs_y:.2f})")
 
-    approach_distance = max(0.2, distance - 0.3)
-    target_x, target_y = calculate_target_position(angle_deg, approach_distance)
+    # 이동 방향 선택: "left", "right", "back", "front"
+    direction = "left"
+    offset = 0.5  # 장애물과 떨어질 거리
+
+    target_x, target_y = get_relative_position(obs_x, obs_y, offset=offset, direction=direction)
+    rospy.loginfo(f"목표 좌표: ({target_x:.2f}, {target_y:.2f}) 방향: {direction}")
     move_to_goal(target_x, target_y)
 
-# 메인 함수
+# ─────────────────────────────
+# [7] 메인 실행
+# ─────────────────────────────
 def main():
     global move_base_client
     rospy.init_node("go_to_obstacle_node")
     rospy.Subscriber("/scan", LaserScan, scan_callback)
     rospy.Subscriber("/odom", Odometry, odom_callback)
 
-    # move_base 클라이언트 초기화
     move_base_client = actionlib.SimpleActionClient('move_base', MoveBaseAction)
-    rospy.loginfo("move_base 서버 대기 중...")
+    rospy.loginfo("move_base 서버 연결 대기 중...")
     move_base_client.wait_for_server()
-    rospy.loginfo("move_base 연결 완료.")
+    rospy.loginfo("move_base 서버 연결됨!")
 
-    rospy.sleep(2.0)  # 초기 센서 수신 대기
+    rospy.sleep(2.0)  # 초기 데이터 수신 대기
     rospy.Timer(rospy.Duration(5.0), check_and_move)
     rospy.spin()
 
