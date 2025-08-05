@@ -8,6 +8,22 @@ class MotionController:
         self.executor = MotionSequenceExecutor()
         self.vision = vision
 
+    #def frontal(self, vision):
+        # 로봇이 정면을 바라볼 때 우선 detect 되는 애가 있으면 발동을 하는 것이기에 이것은 정면을 봐야하는 다른 동작이 있을 시 그 동작 내에 if문을 추가해서 이 함수를 발동 시키게 하는게 맞는 거 같다.
+        # 로봇은 우선 좌표를 받아왔으니 정면을 보게 한다. 그 이후 이미 저장된 좌표로 움직이면 되니
+        #self.executor.motor_publisher_batch(motor_ids=[11], motor_positions=[190], motor_speeds=[5])
+        #rospy.sleep(0.2)
+        #self.executor.motor_publisher_batch(motor_ids=[12], motor_positions=[180], motor_speeds=[5])
+        #rospy.sleep(0.2)
+
+        #coordinate_x = vision.coordinate[0]
+        #coordinate_y = vision.coordinate[1]
+
+        # 정확한 값 말고 오차범위 상정
+        #if(coordinate_x < 320)
+        #    while(coordinate_x == 320)
+
+
     def stand(self):
         motor_speeds = [3] * 10
         motor_positions = [180, 110, 180, 180, 180, 250, 180, 180, 190, 180]
