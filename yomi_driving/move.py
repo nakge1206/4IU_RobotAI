@@ -164,7 +164,7 @@ def main():
     rospy.loginfo("move_base 서버 연결됨!")
 
     rospy.sleep(2.0)  # 초기 데이터 수신 대기
-    rospy.Timer(rospy.Duration(5.0), check_and_move)
+    rospy.Timer(rospy.Duration(3.0), check_and_move)
     rospy.spin()
 
 if __name__ == "__main__":
