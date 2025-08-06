@@ -1,13 +1,28 @@
+import os
+import sys
+
+# 1단계: 현재 파일 경로
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# 2단계: 두 단계 상위 폴더
+base_dir = os.path.abspath(os.path.join(current_dir, "..", ".."))
+
+# 3단계: yomi_driving 폴더 경로 추가
+yomi_driving_path = os.path.join(base_dir, "yomi_driving")
+sys.path.append(yomi_driving_path)
+
+
 import rospy
 from std_msgs.msg import String, Int16MultiArray
 from yomi_motor import MotionSequenceExecutor
-from yomi_driving.move import DistanceMover
-from yomi_driving.automove import ObstacleAvoider
+from move import DistanceMover
+from automove import ObstacleAvoider
 import threading
 
 class MotionController:
     def __init__(self, vision = None):
-        rospy.init_node('motion_controller_node', anonymous=True)
+        if not rospy.core.is_initialized():
+            rospy.init_node('motion_controller_node', anonymous=True)
         self.executor = MotionSequenceExecutor()
         self.vision = vision
         self.mover = DistanceMover(speed=0.2)
@@ -81,6 +96,15 @@ class MotionController:
         rospy.sleep(0.2)
         self.executor.motor_publisher_batch(motor_ids=[11, 12], motor_positions=[190, 180], motor_speeds=[5])
         rospy.sleep(0.2)
+
+    def defalt_motion2(self):
+        self.executor.motor_publisher_batch(motor_ids=[3, 7], motor_positions=[180, 180], motor_speeds=[5])
+        rospy.sleep(0.2)
+        self.executor.motor_publisher_batch(motor_ids=[4, 8], motor_positions=[180, 180], motor_speeds=[5])
+        rospy.sleep(0.2)
+        self.executor.motor_publisher_batch(motor_ids=[5, 9], motor_positions=[180, 180], motor_speeds=[5])
+        rospy.sleep(0.2)
+
 
     def I_joy1(self):
         """(좋아하는 것에 대해) 팔을 살랑살랑 움직인다."""
@@ -226,6 +250,7 @@ class MotionController:
     def I_anger1(self):
         "본체의 바퀴가 빠르게 앞뒤로 움직임"
         self.defalt_motion()
+        self.defalt_motion2()
         self.mover.move_forward(1.5)
         rospy.sleep(2.0)
         self.mover.move_backward(1.5)
@@ -243,22 +268,16 @@ class MotionController:
     def I_anticipation1(self):
         "주변을 돌아다닌다"
         self.defalt_motion()
-        duration = 5.0  # 몇 초 동안 움직일지
-        linear_speed = 0.15  # 앞속도
-        angular_speed = 0.3
+        self.frontal()
 
-        start_time = rospy.Time.now()
-        twist = self.mover.twist
+        side_length = 0.5
+        angle = 90
 
-        while (rospy.Time.now() - start_time).to_sec() < duration and not rospy.is_shutdown():
-            twist.linear.x = linear_speed
-            twist.angular.z = angular_speed
-            self.mover.pub.publish(twist)
-            self.mover.rate.sleep()
-        
-        twist.linear.x = 0.0
-        twist.angular.z = 0.0
-        self.mover.pub.publish(twist)
+        for i in range(4):
+            self.mover.move_forward(side_length)
+            rospy.sleep(0.5)
+            self.mover.rotate_in_place(angle)
+            rospy.sleep(0.5)
 
     def I_anticipation2(self):
         "바퀴로 자리에서 빙글빙글 천천히 돈다"
@@ -273,6 +292,17 @@ class MotionController:
 
     def E_joy1(self):
         "/(행위가 끝난뒤) 크게 공간을 한바퀴 돌며 정해진 위치로 돌아감"
+        self.defalt_motion()
+        self.frontal()
+
+        side_length = 0.5
+        angle = 90
+
+        for i in range(4):
+            self.mover.move_forward(side_length)
+            rospy.sleep(0.5)
+            self.mover.rotate_in_place(angle)
+            rospy.sleep(0.5)
     
     def E_joy2(self):
         "정위치에서 양손을 든다."
@@ -282,12 +312,40 @@ class MotionController:
 
     def E_joy3(self):
         "바퀴로 신나게 빙빙 돈다"
+        self.defalt_motion()
+        for i in range(10):
+            self.mover.rotate_in_place(180)
 
     def E_trust1(self):
         "/신뢰대상에게 일정거리 유지하며 옆에 선다."
+        self.defalt_motion()
+        self.frontal()
+        detect = self._vision_information()
+        if detect == "people":
+            obs = self.automover.get_obstacle_position(threshold=2.0)
+            if obs is None:
+                rospy.loginfo("대상이 감지 되지 않았습니다.")
+                return
+            obs_x, obs_y = obs
+
+            target_x, target_y = self.automover.get_relative_position(obs_x, obs_y, offset = 0.5, direction = "right")
+            self.automober.move_to_goal(target_x, target_y)
     
     def E_trust2(self):
         "일정거리 유지하며 따라다닌다."
+        self.defalt_motion()
+        self.frontal()
+        detect = self._vision_information()
+        while detect == "people":
+            obs = self.automover.get_obstacle_position(threshold=2.0)
+            if obs is None:
+                rospy.loginfo("대상이 감지 되지 않았습니다.")
+                return
+            obs_x, obs_y = obs
+
+            target_x, target_y = self.automover.get_relative_position(obs_x, obs_y, offset = 0.5, direction = "back")
+
+            self.automober.move_to_goal(target_x, target_y)
 
     def E_trust3(self):
         "/사용자 지시가 있으면 즉각 응답 및 행동을 수행하고 대기한다."
@@ -297,12 +355,39 @@ class MotionController:
     
     def E_fear2(self):
         "신뢰하는 사용자 뒤로 숨는다."
+        self.defalt_motion()
+        self.frontal()
+        detect = self._vision_information()
+        if detect == "people":
+            obs = self.automover.get_obstacle_position(threshold=2.0)
+            if obs is None:
+                rospy.loginfo("대상이 감지 되지 않았습니다.")
+                return
+            obs_x, obs_y = obs
+
+            target_x, target_y = self.automover.get_relative_position(obs_x, obs_y, offset = 0.5, direction = "back")
+
+            self.automober.move_to_goal(target_x, target_y)
     
     def E_fear3(self):
         "큰 물건 뒤로 숨는다"
+        self.defalt_motion()
+        self.frontal()
+        obs = self.automover.get_obstacle_position(threshold=2.0)
+        if obs is None:
+            rospy.loginfo("대상이 감지 되지 않았습니다.")
+            return
+        obs_x, obs_y = obs
+
+        target_x, target_y = self.automover.get_relative_position(obs_x, obs_y, offset = 0.5, direction = "back")
+
+        self.automober.move_to_goal(target_x, target_y)
 
     def E_surprise1(self):
         "/(소리-(어? 뭐지?) 작은 목소리 출력 후) 바퀴가 뒤로 살짝 밀리며 정지"
+        self.mover.move_backward(1.5)
+        rospy.sleep(0.2)
+        self.stand()
 
     def E_surprise2(self):
         "미세 움직임으로 진동 표현, 떨림 표현"
@@ -320,6 +405,8 @@ class MotionController:
 
     def E_sadness1(self):
         "느리게 이동"
+        self.defalt_motion()
+        self.mover.move_forward(1.0)
 
     def E_sadness2(self):
         "고개를 숙이듯 머리가 아래로 향함"
@@ -332,6 +419,12 @@ class MotionController:
 
     def E_disgust1(self):
         "원치 않은 사용자 접근 시 후진"
+        self.defalt_motion()
+        detect = self._vision_information()
+        if detect == "people":
+            self.mover.move_backward(1.5)
+            rospy.sleep(0.2)
+            self.stand()
 
     def E_disgust2(self):
         "옆으로 돌아서기(고개를 돌리는 것과 같은 효과 일거 같아서 그렇게 만듬)"
@@ -341,9 +434,17 @@ class MotionController:
 
     def E_disgust3(self):
         "도망가기"
+        self.defalt_motion()
+        self.mover.move_backward(3.0)
+        rospy.sleep(0.2)
     
     def E_anger1(self):
         "본체의 바퀴가 빠르게 앞뒤로 움직임"
+        self.defalt_motion()
+        self.mover.move_forward(1.5)
+        rospy.sleep(2.0)
+        self.mover.move_backward(1.5)
+        rospy.sleep(2.0)
 
     def E_anger2(self):
         "몸 전체에 진동(가능하면)"
@@ -356,12 +457,38 @@ class MotionController:
 
     def E_anger3(self):
         "주변을 빠르게 돌아다닌다"
+        self.defalt_motion()
+        self.frontal()
+
+        self.mover.speed = 0.5
+        side_length = 0.5
+        angle = 90
+
+        for i in range(4):
+            self.mover.move_forward(side_length)
+            rospy.sleep(0.5)
+            self.mover.rotate_in_place(angle)
+            rospy.sleep(0.5)
 
     def E_anticipation1(self):
         "주변을 돌아다닌다"
+        self.defalt_motion()
+        self.frontal()
+
+        side_length = 0.5
+        angle = 90
+
+        for i in range(4):
+            self.mover.move_forward(side_length)
+            rospy.sleep(0.5)
+            self.mover.rotate_in_place(angle)
+            rospy.sleep(0.5)
 
     def E_anticipation2(self):
         "바퀴로 자리에서 빙글빙글 천천히 돈다"
+        self.defalt_motion()
+        for i in range(6):
+            self.mover.rotate_in_place(180)
     
     def E_anticipation3(self):
         "새로운 입력을 기다리는 듯 정지 후 전방 주시"
@@ -402,31 +529,31 @@ class MotionController:
 
 if __name__ == '__main__':
     # 터미널 직접 입력
-    # try:
-    #     controller = MotionController()
-    #     while not rospy.is_shutdown():
-    #         func_name = input("함수이름(종료는 end) ")
-    #         if func_name.lower() == 'end':
-    #             break
-    #         elif hasattr(controller, func_name):
-    #             func = getattr(controller, func_name)
-    #             if callable(func):
-    #                 try:
-    #                     func()
-    #                 except Exception as e:
-    #                     print(f"함수 실행 중 오류 발생: {e}")
-    #             else:
-    #                 print("호출 가능한 함수가 아님.")
-    #         else:
-    #             print("해당하는 함수 x")
-    # except rospy.ROSInterruptException:
-    #     pass
-    try:
-        controller = MotionController()
-        while not rospy.is_shutdown():
-            func_name = input("함수이름(종료는 end) ")
-            if func_name.lower() == 'end':
-                break
-            controller.run_motion(func_name)
-    except rospy.ROSInterruptException:
-        pass
+     try:
+         controller = MotionController()
+         while not rospy.is_shutdown():
+             func_name = input("함수이름(종료는 end) ")
+             if func_name.lower() == 'end':
+                 break
+             elif hasattr(controller, func_name):
+                 func = getattr(controller, func_name)
+                 if callable(func):
+                     try:
+                         func()
+                     except Exception as e:
+                         print(f"함수 실행 중 오류 발생: {e}")
+                 else:
+                     print("호출 가능한 함수가 아님.")
+             else:
+                 print("해당하는 함수 x")
+     except rospy.ROSInterruptException:
+         pass
+    #try:
+    #   controller = MotionController()
+    #    while not rospy.is_shutdown():
+    #        func_name = input("함수이름(종료는 end) ")
+    #        if func_name.lower() == 'end':
+    #            break
+    #        controller.run_motion(func_name)
+    #except rospy.ROSInterruptException:
+    #    pass
