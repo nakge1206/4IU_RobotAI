@@ -6,19 +6,27 @@ from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry
 from tf.transformations import euler_from_quaternion
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
+from nav_msgs.msg import OccupancyGrid
+
 
 class ObstacleAvoider:
     def __init__(self):
         """
         노드 초기화 및 주요 변수 선언, 센서 구독, move_base 액션 서버 연결 등 초기 설정 수행
         """
+        if __init__(self, init_node=False):
+            rospy.init_node("go_to_obstacle_node")
+
         self.latest_scan = None   # 최신 LaserScan 데이터
         self.robot_pose = {"x": 0.0, "y": 0.0, "yaw": 0.0}  # 오도메트리 기반 로봇 위치 정보
         self.is_moving = False    # 이동 중 여부
         if not rospy.core.is_initialized():
             rospy.init_node("go_to_obstacle_node")
+        self.map_data = None    # 맵 데이터 (OccupancyGrid)
         rospy.Subscriber("/scan", LaserScan, self.scan_callback)      # 라이다 데이터 구독
         rospy.Subscriber("/odom", Odometry, self.odom_callback)       # 오도메트리 데이터 구독
+        rospy.Subscriber("/map", OccupancyGrid, self.map_callback)    # 맵 데이터 구독
+
 
         # move_base 액션 서버 연결
         self.move_base_client = actionlib.SimpleActionClient('move_base', MoveBaseAction)
@@ -31,6 +39,10 @@ class ObstacleAvoider:
 
         rospy.sleep(2.0)  # 초기 TF 및 센서 수신 대기
         rospy.Timer(rospy.Duration(5.0), self.check_and_move)  # 5초 주기로 장애물 확인 및 이동
+
+
+    def map_callback(self, msg):
+        self.map_data = msg
 
 
     def scan_callback(self, msg):
@@ -65,6 +77,69 @@ class ObstacleAvoider:
             return {"x": trans[0], "y": trans[1], "yaw": yaw}
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
             return None
+
+
+    # 벽 좌표 를 찾는 함수
+    # 맵 데이터에서 가장 가까운 벽의 좌표를 반환
+    def get_nearest_wall(self):
+        if self.map_data is None:
+            rospy.logwarn("맵 데이터 없음")
+            return None
+
+        robot_pose = self.get_robot_pose_in_map()
+        if robot_pose is None:
+            return None
+
+        map_origin = self.map_data.info.origin.position
+        resolution = self.map_data.info.resolution
+        width = self.map_data.info.width
+        height = self.map_data.info.height
+        data = self.map_data.data
+
+        # 로봇의 맵 상 위치를 픽셀 좌표로
+        rx = int((robot_pose["x"] - map_origin.x) / resolution)
+        ry = int((robot_pose["y"] - map_origin.y) / resolution)
+
+        min_dist = float('inf')
+        nearest = None
+
+        for y in range(height):
+            for x in range(width):
+                index = y * width + x
+                if data[index] == 100:  # 벽
+                    dx = x - rx
+                    dy = y - ry
+                    dist = math.hypot(dx, dy)
+                    if dist < min_dist:
+                        min_dist = dist
+                        nearest = (x, y)
+
+        if nearest is None:
+            return None
+
+        wall_x = nearest[0] * resolution + map_origin.x
+        wall_y = nearest[1] * resolution + map_origin.y
+        return (wall_x, wall_y)
+
+
+    def go_to_nearest_wall(self):
+        """
+        가장 가까운 벽 앞으로 이동 (맵 기반)
+        """
+        wall = self.get_nearest_wall()
+        if wall is None:
+            rospy.loginfo("벽 좌표를 찾을 수 없음")
+            return
+
+        wall_x, wall_y = wall
+        rospy.loginfo(f"가장 가까운 벽 위치: x={wall_x:.2f}, y={wall_y:.2f}")
+
+        # 벽 앞쪽으로 약간 떨어진 좌표 계산 (로봇 쪽으로 0.5m 뒤로 이동)
+        target_x, target_y = self.get_relative_position(wall_x, wall_y, offset=0.5, direction="back")
+        rospy.loginfo(f"벽 앞 이동 목표: x={target_x:.2f}, y={target_y:.2f}")
+
+        self.move_to_goal(target_x, target_y)
+
 
 
     def get_obstacle_position(self, threshold=1.5):
