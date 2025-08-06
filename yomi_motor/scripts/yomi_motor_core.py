@@ -1,5 +1,5 @@
 import openai
-from yomi_motion import MotionController
+# from yomi_motion import MotionController
 from dotenv import load_dotenv
 import os
 import time
@@ -23,7 +23,7 @@ class motorCore:
 
     def run_motion_from_gpt(self):
         """main에서 디버깅용으로 무한반복 하는 함수"""
-        controller = MotionController()
+        # controller = MotionController()
 
         while True:
             print("\n--- GPT 입력 포맷 예시 ---")
@@ -49,18 +49,11 @@ class motorCore:
                     func_name = self.ask_finetuned_model(user_input)
                     print(f"[GPT 결과] 함수명: {func_name}")
 
-                if hasattr(controller, func_name):
-                    func = getattr(controller, func_name)
-                    if callable(func):
-                        func()
-                    else:
-                        print(f"[ERROR] '{func_name}'은 함수가 아닙니다.")
-                else:
-                    print(f"[ERROR] MotionController에 '{func_name}' 함수 없음.")
             except Exception as e:
                 print(f"[예외 발생] {e}")
 
             time.sleep(1)
 
 if __name__ == '__main__':
-    run_motion_from_gpt()
+    motor_core = motorCore()
+    motor_core.run_motion_from_gpt()

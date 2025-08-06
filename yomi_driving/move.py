@@ -9,7 +9,8 @@ class DistanceMover:
         로봇 이동 제어 클래스
         - speed: 선속도(m/s) 또는 각속도(rad/s)
         """
-        rospy.init_node('distance_mover', anonymous=True)
+        if not rospy.core.is_initialized():
+            rospy.init_node('distance_mover', anonymous=True)
         self.pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
         self.rate = rospy.Rate(10)
         self.twist = Twist()

@@ -20,8 +20,9 @@ class ObstacleAvoider:
         self.latest_scan = None   # 최신 LaserScan 데이터
         self.robot_pose = {"x": 0.0, "y": 0.0, "yaw": 0.0}  # 오도메트리 기반 로봇 위치 정보
         self.is_moving = False    # 이동 중 여부
+        if not rospy.core.is_initialized():
+            rospy.init_node("go_to_obstacle_node")
         self.map_data = None    # 맵 데이터 (OccupancyGrid)
-
         rospy.Subscriber("/scan", LaserScan, self.scan_callback)      # 라이다 데이터 구독
         rospy.Subscriber("/odom", Odometry, self.odom_callback)       # 오도메트리 데이터 구독
         rospy.Subscriber("/map", OccupancyGrid, self.map_callback)    # 맵 데이터 구독
@@ -30,7 +31,7 @@ class ObstacleAvoider:
         # move_base 액션 서버 연결
         self.move_base_client = actionlib.SimpleActionClient('move_base', MoveBaseAction)
         rospy.loginfo("move_base 서버 연결 대기 중...")
-        self.move_base_client.wait_for_server()
+        # self.move_base_client.wait_for_server()
         rospy.loginfo("move_base 서버 연결됨!")
 
         # TF listener 생성 (map ↔ base_link 변환 추적)

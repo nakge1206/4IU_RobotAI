@@ -7,7 +7,7 @@ import time
 import re
 import json
 
-import asyncio
+# import asyncio
 
 #ros통신용
 import rospy, rosgraph
@@ -19,7 +19,11 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'stt'))
 sys.path.append(os.path.join(os.path.dirname(__file__), 'llm_core'))
 sys.path.append(os.path.join(os.path.dirname(__file__), 'tts'))
 sys.path.append(os.path.join(os.path.dirname(__file__), 'vision_face'))
-sys.path.append(os.path.abspath('./yomi_motor/scripts'))
+current_dir = os.path.dirname(os.path.abspath(__file__))
+base_dir = os.path.abspath(os.path.join(current_dir, ".."))
+yomi_driving_path = os.path.join(base_dir, "yomi_motor/scripts")
+sys.path.append(yomi_driving_path)
+# sys.path.append(os.path.abspath('./yomi_motor'))
 
 
 # 각 모듈 임포트
@@ -27,8 +31,10 @@ from stt.realtime_stt_module import STTModule           #STT
 from tts.TTS_server import TTSServer, VITS, TTSClient   #TTS
 from vision_face.VisionFace import VisonFaceMain        #Vision
 from llm_core.inference_client_ax4 import LLMClient     #LLM
-# from yomi_motor import MotionSequenceExecutor           #Motor
-
+from yomi_motor_core import motorCore                   #Motor_LLM
+from yomi_motion import MotionController  #MotionController
+# from yomi_motor.scripts.yomi_motor_core import motorCore#Motor
+# from yomi_motor.scripts.yomi_motion import MotionController
 
 class Yomi:
     def __init__(self, isSTT=True, isTTS=True, isLLM=True, isVisionFace=True, mbti="I"):
@@ -88,6 +94,8 @@ class Yomi:
         print(f"[YOMI] LLM : 준비완료 ({isLLM})")
         self.VisionFace = VisonFaceMain(interval=2, on_vision_callback=self.handle_vision, viewGUI=True) if isVisionFace else None
         print(f"[YOMI] VisionFace : 준비완료 ({isVisionFace})")
+        self.motor_core = motorCore()
+        self.motor_controller = MotionController()
         
         #ROS
         try:
@@ -330,8 +338,17 @@ class Yomi:
 
     def handle_motor_llm(self, text):
         """모터 관련 LLM 처리"""
-        # todo: 여기에 모터 관련 LLM 처리 로직을 추가하면 됨
-
+        func_name = self.motor_core.ask_finetuned_model(text)
+        print(f"[YOMI] (handle_motor_llm) MOTOR_LLM 결과 : {func_name}")
+        if hasattr(self.motor_controller, func_name):
+            func = getattr(self.motor_controller, func_name)
+            print(f"[YOMI] [hadle_motor_llm] '{func_name}' 함수실행.")
+            if callable(func):
+                func()
+            else:
+                print(f"[YOMI] [hadle_motor_llm] Warning :'{func_name}'은 함수가 아닙니다.")
+        else:
+            print(f"[[YOMI] [hadle_motor_llm] Warning : MotionController에 '{func_name}' 함수 없음.")
         self.stt_llm = False
         self.switch_llm = False
 
