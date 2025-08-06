@@ -3,6 +3,7 @@ import asyncio
 import websockets
 import os
 import sys
+import json
 
 sys.path.append(os.path.dirname(__file__))
 from llm_responder_ax4 import LLMResponder
@@ -16,11 +17,22 @@ async def handle_connection(websocket):
     print("[LLM 서버] 클라이언트 연결됨")
     while True:
         try:
-            question = await websocket.recv()
+            raw_question = await websocket.recv()
+            question, mbti_code = json.loads(raw_question)
+            if mbti_code == "I":
+                mbti = "INFP"
+            elif mbti_code == "E":
+                mbti = "ESTJ"
+            else:
+                mbti = None
             print(f"[수신] 질문: {question}")
+            if mbti is not None:
+                print(f"[수신] MBTI: {mbti}")
+            else:
+                print("[수신] MBTI 정보 없음")
 
             loop = asyncio.get_event_loop()
-            response = await loop.run_in_executor(None, llm.generate_response, question)
+            response = await loop.run_in_executor(None, llm.generate_response, question, None, None, mbti)
 
             await websocket.send(response)
             print(f"[전송] 응답: {response}")

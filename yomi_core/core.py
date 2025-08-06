@@ -4,6 +4,8 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"  # OpenMP 중복 방지 설정
 import threading
 import random
 import time
+import re
+import json
 
 import asyncio
 
@@ -35,9 +37,10 @@ class Yomi:
         self.isLLM = isLLM
         self.isVisionFace = isVisionFace
         self.mbti = mbti
+        self.lock = threading.Lock()
 
         #STT Timeout
-        self.stt_timeout = 20 #stt_timeout-몇 초마다 Vision으로 LLM실행하는지
+        self.stt_timeout = 20 if mbti == "e" else 30  #stt_timeout-몇 초마다 Vision으로 LLM실행하는지
         self.sttTimer = None
         self.visionEnable = False
 
@@ -54,6 +57,23 @@ class Yomi:
 
         #시각정보 저장용
         self.lastVision = None
+
+        #모델 입출력 변수
+        self.stt_llm = False
+        self.switch_llm = False
+
+        self.llm_response = None
+        self.llm_emotion_KO = None
+        self.llm_emotion_EN = None
+
+        self.stt_text = None
+        self.stt_info = None
+
+        self.vision_detection = None
+        self.vision_location = None
+
+        self.switch_position = None
+        
 
         #모듈 초기화
         self.stt = STTModule(on_text_callback=self.handle_stt) if isSTT else None
@@ -134,44 +154,56 @@ class Yomi:
     
     def handle_stt(self, stt_texts):
         """STT발생 시 처리 함수"""
-        self.sttEnable = False
-        self._sttPause()
-        stt_text, stt_info = stt_texts
         print(f"[YOMI] (handle_stt) STT 결과: {stt_texts}")
+        with self.lock:
+            self.sttEnable = False
+            self.stt_text, self.stt_info = stt_texts
+        self._sttPause()
 
         #STT Timeout
         if self.sttTimer:
             self.sttTimer.cancel()
 
-        stt_prompt = f"청각정보 : {stt_text} \n"
-        llm_prompt = stt_prompt + self.make_yolo_prompt()
-        print(f"[YOMI] (handle_stt) llm_prompt :{llm_prompt}")
-        self.handle_llm(llm_prompt)
+        with self.lock:
+            self.stt_llm = True
+            self.switch_llm = False
+
+        if self.isLLM:
+            self.handle_main_llm(self.make_prompt("main_llm"))
         
+        #STT Timeout 재설정
         self.sttTimer = threading.Timer(self.stt_timeout, self._vision_open)
         self.sttTimer.start()
     
     def _vision_open(self):
-        self.visionEnable = True
         #todo : 여기서 고개 돌아다니면서 확인하는 모션 함수 추가하면 될듯
+        self.visionEnable = True
 
     def handle_vision(self, visionText=None):
         """STT N초 이상 안들어오면 vision 정보 활용"""
-        self.lastVision = visionText
+        with self.lock:
+            self.lastVision = visionText
         
-        if self.joy_master_flag and self.isVisionFace and self.visionEnable:
+        if self.isVisionFace and self.joy_master_flag and self.isVisionFace and self.visionEnable:
             print("[YOMI] (handle_vision) STT timeout - vision 실행")
             print(f"[YOMI] (handle_vision) 감지 객체 :  {self.lastVision}")
             
-            self.visionEnable=False
-            self.vision_flag = True
+            with self.lock:
+                self.visionEnable = False
+                self.vision_flag = True
             self._sttPause()
 
-            self.handle_llm(self.make_yolo_prompt())
-
-            #STT Timeout
+            #STT Timeer 종료
             if self.sttTimer:
                 self.sttTimer.cancel()
+
+            with self.lock:
+                self.stt_llm = False
+                self.switch_llm = False
+            if self.isLLM:
+                self.handle_main_llm(self.make_prompt("main_llm"))
+            
+            #STT Timeout 재설정
             self.sttTimer = threading.Timer(self.stt_timeout, self._vision_open)
             self.sttTimer.start()
 
@@ -190,20 +222,116 @@ class Yomi:
             if index in touch_map:
                 print(f"[YOMI] (handle_switch) 눌린 부위: {touch_map[index]} (switch={index}) \n")
                 
-                self.switch_flag = True
+                with self.lock:
+                    self.switch_flag = True
+                    self.switch_position = touch_map[index]
+                    self.stt_llm = False
+                    self.switch_llm = True
+
                 self._sttPause()
+
+                #STT Timeout
+                if self.sttTimer:
+                    self.sttTimer.cancel()
+
+                if self.isLLM:
+                    self.handle_main_llm(self.make_prompt("main_llm"))
                 
-                switch_prompt = f"스위치 입력 : {touch_map[index]} 부위가 눌림 \n"
-                llm_input = switch_prompt + self.make_yolo_prompt()
-                self.handle_llm(llm_input)
+                #STT Timeout 재설정
+                self.sttTimer = threading.Timer(self.stt_timeout, self._vision_open)
+                self.sttTimer.start()
                 
             else:
                 print(f"[YOMI] (handle_switch) 알 수 없는 switch 값: {index}")
+
+    def make_prompt(self, target = "main_llm"):
+        """
+        각 모듈에 보낼 프롬프트 생성
+        Args:
+            target (str): "main_llm" 또는 "motor_llm" 중 하나
+        """
+        prompt = []
+        with self.lock:
+            stt_llm = self.stt_llm
+            switch_llm = self.switch_llm
+            stt_text = self.stt_text
+            switch_position = self.switch_position
+            vision_copy = list(self.lastVision) if self.lastVision else None
+            llm_response = self.llm_response
+            llm_emotion_EN = self.llm_emotion_EN
+
+        if stt_llm:
+            prompt.append(f"청각정보 : {stt_text} \n")
+        if switch_llm:
+            prompt.append(f"스위치 입력 : {switch_position} 부위가 눌림 \n")
+        
+        if not vision_copy:
+            return "시각정보 : 감지된 것이 없음"
+        for item in vision_copy:
+            label = item['label']
+            prompt.append(f"시각정보 : {label}이 있습니다.\n")
+            """
+            # 해당 부분은 좌표 정보 포함임. 필요하면 주석해제서 사용
+            box = item['box']
+            center_x = (box[0] + box[2])/2
+            center_y = (box[2] + box[3]) / 2
+            prompt.append(f"시각정보 : {label}이 화면의 ({center_x:.1f}, {center_y:.1f})에 있습니다.\n")
+            """
     
-    def handle_llm(self, text):
+        if target == "motor_llm":
+            prompt.append(f"LLM_대답 : {llm_response}\n")
+            prompt.append(f"LLM_감정 : {llm_emotion_EN}\n")
+
+        result = ''.join(prompt)
+        
+        print(f"[YOMI] (make_prompt) 생성된 프롬프트 (target={target}, stt_llm={stt_llm}, switch_llm={switch_llm}): \n{result}")
+
+        resultMbti = json.dumps([result, self.mbti])
+
+        return resultMbti
+    
+    def handle_main_llm(self, text):
+        """메인 LLM 처리"""
         responseAndEmotion = self.llm.send(text)
+        emotion_map = {
+            "화남": "angry",
+            "기대": "anticipation",
+            "혐오": "disgust",
+            "공포": "fear",
+            "기쁨": "joy",
+            "슬픔": "sadness",
+            "놀람": "surprise"
+        }
+        match = re.search(r'"대답":\s*(.*?)\s*"감정":\s*(.*)', responseAndEmotion, re.S)
+        with self.lock:
+            if match:
+                self.llm_response = match.group(1).strip()
+                self.llm_emotion_KO = match.group(2).strip()
+                self.llm_emotion_EN = emotion_map.get(self.llm_emotion_KO, "no")
+            else:
+                print(f"[YOMI] (handle_main_llm) 파싱 실패, 원본 응답: {responseAndEmotion}")
+                self.llm_response = "LLM이 이상해"
+                self.llm_emotion_KO = "no"
+                self.llm_emotion_EN = "no"
+
+        self.handle_motor_llm(self.make_prompt("motor_llm"))
+
+        if self.isVisionFace:
+            with self.lock:
+                emotion_en = self.llm_emotion_EN
+            self.VisionFace.face_set_emotion(emotion_en)
+
         if self.isTTS:
-            self.try_send_tts(responseAndEmotion)
+            with self.lock:
+                response_text = self.llm_response
+            self.try_send_tts(response_text)
+
+    def handle_motor_llm(self, text):
+        """모터 관련 LLM 처리"""
+        # todo: 여기에 모터 관련 LLM 처리 로직을 추가하면 됨
+
+        self.stt_llm = False
+        self.switch_llm = False
 
 
     def on_tts_start(self):
@@ -231,19 +359,19 @@ class Yomi:
         else:
             print("[YOMI] (try_send_tts) TTS가 아직 끝나지 않았습니다. 새 요청 무시.")
     
-    def make_yolo_prompt(self):
-        """이미지 정보를 문자열로"""
-        if not self.lastVision:
-            return "시각정보 : 감지된 것이 없음"
+    # def make_yolo_prompt(self):
+    #     """이미지 정보를 문자열로"""
+    #     if not self.lastVision:
+    #         return "시각정보 : 감지된 것이 없음"
         
-        result = []
-        for item in self.lastVision:
-            label = item['label']
-            box = item['box']
-            center_x = (box[0] + box[2])/2
-            center_y = (box[2] + box[3]) / 2
-            result.append(f"시각정보 : {label}이 화면의 ({center_x:.1f}, {center_y:.1f})에 있습니다.")
-        return ', '.join(result)
+    #     result = []
+    #     for item in self.lastVision:
+    #         label = item['label']
+    #         box = item['box']
+    #         center_x = (box[0] + box[2])/2
+    #         center_y = (box[2] + box[3]) / 2
+    #         result.append(f"시각정보 : {label}이 화면의 ({center_x:.1f}, {center_y:.1f})에 있습니다.")
+    #     return ', '.join(result)
 
 if __name__ == "__main__":
     service = Yomi(isSTT=True, isLLM=True, isTTS=True, isVisionFace=True)
