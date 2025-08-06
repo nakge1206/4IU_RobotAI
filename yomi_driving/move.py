@@ -1,55 +1,84 @@
+#!/usr/bin/env python3
 import rospy
 from geometry_msgs.msg import Twist
+import math
 
-def move_robot_by_distance(forward=0.0, backward=0.0, left=0.0, right=0.0, speed=0.2):
-    """
-    지정한 거리만큼 로봇을 이동시키는 함수
-    - forward: 앞쪽 이동 거리 (m)
-    - backward: 뒤쪽 이동 거리 (m)
-    - left: 왼쪽 회전 거리 (deg, 각도 기반이므로 회전 반경 고려X)
-    - right: 오른쪽 회전 거리 (deg)
-    - speed: 선속도 또는 각속도 (m/s 또는 rad/s)
-    """
+class DistanceMover:
+    def __init__(self, speed=0.2):
+        """
+        로봇 이동 제어 클래스
+        - speed: 선속도(m/s) 또는 각속도(rad/s)
+        """
+        rospy.init_node('distance_mover', anonymous=True)
+        self.pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
+        self.rate = rospy.Rate(10)
+        self.twist = Twist()
+        self.speed = speed
 
-    rospy.init_node('distance_mover', anonymous=True)
-    pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
-    rate = rospy.Rate(10)
-    twist = Twist()
-
-    def send_motion(linear_x=0.0, angular_z=0.0, duration=1.0):
+    def send_motion(self, linear_x=0.0, angular_z=0.0, duration=1.0):
+        """지정된 시간 동안 속도 명령 전송"""
         start_time = rospy.Time.now()
-        while (rospy.Time.now() - start_time).to_sec() < duration:
-            twist.linear.x = linear_x
-            twist.angular.z = angular_z
-            pub.publish(twist)
-            rate.sleep()
+        while (rospy.Time.now() - start_time).to_sec() < duration and not rospy.is_shutdown():
+            self.twist.linear.x = linear_x
+            self.twist.angular.z = angular_z
+            self.pub.publish(self.twist)
+            self.rate.sleep()
         # 정지
-        twist.linear.x = 0.0
-        twist.angular.z = 0.0
-        pub.publish(twist)
+        self.twist.linear.x = 0.0
+        self.twist.angular.z = 0.0
+        self.pub.publish(self.twist)
 
-    # 직진
-    if forward > 0.0:
-        duration = forward / speed
-        send_motion(linear_x=+speed, duration=duration)
+    def move_by_distance(self, forward=0.0, backward=0.0, left=0.0, right=0.0):
+        """거리 또는 각도로 로봇 이동"""
+        if forward > 0.0:
+            duration = forward / self.speed
+            self.send_motion(linear_x=+self.speed, duration=duration)
 
-    # 후진
-    if backward > 0.0:
-        duration = backward / speed
-        send_motion(linear_x=-speed, duration=duration)
+        if backward > 0.0:
+            duration = backward / self.speed
+            self.send_motion(linear_x=-self.speed, duration=duration)
 
-    # 왼쪽 회전 (deg → rad 변환 필요)
-    if left > 0.0:
-        angular_speed = speed  # rad/s
-        duration = (left * 3.141592 / 180) / angular_speed
-        send_motion(angular_z=+angular_speed, duration=duration)
+        if left > 0.0:
+            angular_speed = self.speed
+            duration = (left * math.pi / 180) / angular_speed
+            self.send_motion(angular_z=+angular_speed, duration=duration)
 
-    # 오른쪽 회전
-    if right > 0.0:
-        angular_speed = speed
-        duration = (right * 3.141592 / 180) / angular_speed
-        send_motion(angular_z=-angular_speed, duration=duration)
+        if right > 0.0:
+            angular_speed = self.speed
+            duration = (right * math.pi / 180) / angular_speed
+            self.send_motion(angular_z=-angular_speed, duration=duration)
 
-# 사용 예시:
-# 앞으로 1m, 왼쪽으로 90도 회전
-# move_robot_by_distance(forward=1.0, left=90, speed=0.2)
+    def move_forward(self, distance):
+        """앞으로만 이동"""
+        if distance > 0:
+            duration = distance / self.speed
+            self.send_motion(linear_x=+self.speed, duration=duration)
+
+    def rotate_in_place(self, angle_deg):
+        """제자리에서 회전 (양수=왼쪽, 음수=오른쪽)"""
+        angular_speed = self.speed  # rad/s
+        duration = (abs(angle_deg) * math.pi / 180) / angular_speed
+        if angle_deg > 0:
+            self.send_motion(angular_z=+angular_speed, duration=duration)
+        elif angle_deg < 0:
+            self.send_motion(angular_z=-angular_speed, duration=duration)
+
+
+if __name__ == "__main__":
+    try:
+        mover = DistanceMover(speed=0.2)
+
+        rospy.sleep(1)
+        rospy.loginfo("앞으로 1m 이동")
+        mover.move_forward(1.0)
+
+        rospy.sleep(1)
+        rospy.loginfo("제자리에서 왼쪽으로 90도 회전")
+        mover.rotate_in_place(90)
+
+        rospy.sleep(1)
+        rospy.loginfo("제자리에서 오른쪽으로 45도 회전")
+        mover.rotate_in_place(-45)
+
+    except rospy.ROSInterruptException:
+        pass
