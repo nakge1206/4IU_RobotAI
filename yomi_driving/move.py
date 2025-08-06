@@ -53,6 +53,12 @@ class DistanceMover:
         if distance > 0:
             duration = distance / self.speed
             self.send_motion(linear_x=+self.speed, duration=duration)
+    
+    def move_backward(self, distance):
+        """뒤로만 이동"""
+        if distance > 0:
+            duration = distance / self.speed
+            self.send_motion(linear_x=-self.speed, duration=duration)
 
     def rotate_in_place(self, angle_deg):
         """제자리에서 회전 (양수=왼쪽, 음수=오른쪽)"""
