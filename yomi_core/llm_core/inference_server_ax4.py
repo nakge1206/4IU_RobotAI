@@ -1,4 +1,4 @@
-# yomi_core/llm_core/inference_server_ax4.py
+
 import asyncio
 import websockets
 import os
@@ -8,18 +8,20 @@ sys.path.append(os.path.dirname(__file__))
 from llm_responder_ax4 import LLMResponder
 
 llm = LLMResponder(
-    model_path="yomi_core/llm_core/adapter_ax",
+    model_path="C:/Users/COM/Desktop/yomi/4IU_RobotAI/yomi_core/llm_core/adapter_ax",
     adapter_path=None
 )
 
-async def handle_connection(websocket):  # path 생략 가능 (websockets 12.x+)
+async def handle_connection(websocket):
     print("[LLM 서버] 클라이언트 연결됨")
     while True:
         try:
             question = await websocket.recv()
             print(f"[수신] 질문: {question}")
 
-            response = llm.generate_response(question)
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(None, llm.generate_response, question)
+
             await websocket.send(response)
             print(f"[전송] 응답: {response}")
         except Exception as e:
@@ -32,9 +34,9 @@ async def main():
         handle_connection,
         "0.0.0.0",
         8765,
-        subprotocols=["llm-protocol"],  # ✅ 중요: subprotocol 명시
-        ping_interval=None,
-        ping_timeout=None
+        subprotocols=["llm-protocol"],
+        ping_interval=60,      # 수정
+        ping_timeout=60        # 수정
     )
     print("[LLM 서버] 시작됨 (ws://0.0.0.0:8765)")
     await server.wait_closed()

@@ -5,7 +5,6 @@ import threading
 import random
 import time
 
-import logging
 import asyncio
 
 #ros통신용
@@ -30,11 +29,12 @@ from llm_core.inference_client_ax4 import LLMClient     #LLM
 
 
 class Yomi:
-    def __init__(self, isSTT=True, isTTS=True, isLLM=True, isVisionFace=True):
+    def __init__(self, isSTT=True, isTTS=True, isLLM=True, isVisionFace=True, mbti="I"):
         self.isSTT = isSTT
         self.isTTS = isTTS
         self.isLLM = isLLM
-        self.isVisionFace = isVisionFace        
+        self.isVisionFace = isVisionFace
+        self.mbti = mbti
 
         #STT Timeout
         self.stt_timeout = 20 #stt_timeout-몇 초마다 Vision으로 LLM실행하는지
@@ -77,9 +77,8 @@ class Yomi:
         #ROS Publisher
         if not rospy.core.is_initialized():
             rospy.init_node('yomi_core', anonymous=True)
-        # self.llm_emotion = rospy.Publisher('/llm_emotion', String, queue_size=10)
-        # self.tts_state = rospy.Publisher('/tts_state', Bool, queue_size=10)
-        print("[YOMI] ROS Publisher: 토픽(tts실행여부) 연결완료")
+        self.tts_state = rospy.Publisher('/tts_state', Bool, queue_size=10)
+        print("[YOMI] ROS Publisher: 토픽(tts_state) 연결완료")
 
         #ROS Subscriber
         rospy.Subscriber('/switch_1_state', Bool, self.handle_switch, callback_args=1)
@@ -88,7 +87,7 @@ class Yomi:
         rospy.Subscriber('/switch_4_state', Bool, self.handle_switch, callback_args=4)
         rospy.Subscriber('/switch_5_state', Bool, self.handle_switch, callback_args=5)
         rospy.Subscriber('/switch_6_state', Bool, self.handle_switch, callback_args=6)
-        print("[YOMI] ROS Subscriber: 토픽(switch) 연결완료")
+        print("[YOMI] ROS Subscriber: 토픽(switch_state) 연결완료")
         
 
     def start(self):
@@ -138,11 +137,17 @@ class Yomi:
         self.sttEnable = False
         self._sttPause()
         stt_text, stt_info = stt_texts
-        print(f"[YOMI] (handle_stt) STT 결과: {stt_texts}")        
-        
+        print(f"[YOMI] (handle_stt) STT 결과: {stt_texts}")
+
         #STT Timeout
         if self.sttTimer:
             self.sttTimer.cancel()
+
+        stt_prompt = f"청각정보 : {stt_text} \n"
+        llm_prompt = stt_prompt + self.make_yolo_prompt()
+        print(f"[YOMI] (handle_stt) llm_prompt :{llm_prompt}")
+        self.handle_llm(llm_prompt)
+        
         self.sttTimer = threading.Timer(self.stt_timeout, self._vision_open)
         self.sttTimer.start()
     
@@ -153,20 +158,22 @@ class Yomi:
     def handle_vision(self, visionText=None):
         """STT N초 이상 안들어오면 vision 정보 활용"""
         self.lastVision = visionText
+        
         if self.joy_master_flag and self.isVisionFace and self.visionEnable:
             print("[YOMI] (handle_vision) STT timeout - vision 실행")
-            print(self.lastVision)
+            print(f"[YOMI] (handle_vision) 감지 객체 :  {self.lastVision}")
+            
             self.visionEnable=False
             self.vision_flag = True
             self._sttPause()
 
-            self.llm.send(self.make_yolo_prompt())
+            self.handle_llm(self.make_yolo_prompt())
 
             #STT Timeout
             if self.sttTimer:
                 self.sttTimer.cancel()
-                self.sttTimer = threading.Timer(self.stt_timeout, self._vision_open)
-                self.sttTimer.start()
+            self.sttTimer = threading.Timer(self.stt_timeout, self._vision_open)
+            self.sttTimer.start()
 
     def handle_switch(self, msg, index): 
         """ROS토픽 이용 Switch 처리함수"""
@@ -182,9 +189,11 @@ class Yomi:
             }
             if index in touch_map:
                 print(f"[YOMI] (handle_switch) 눌린 부위: {touch_map[index]} (switch={index}) \n")
+                
                 self.switch_flag = True
                 self._sttPause()
-                switch_prompt = f"스위치 입력 : {touch_map[index]} 부위가 눌림"
+                
+                switch_prompt = f"스위치 입력 : {touch_map[index]} 부위가 눌림 \n"
                 llm_input = switch_prompt + self.make_yolo_prompt()
                 self.handle_llm(llm_input)
                 
@@ -192,19 +201,21 @@ class Yomi:
                 print(f"[YOMI] (handle_switch) 알 수 없는 switch 값: {index}")
     
     def handle_llm(self, text):
-        responseAndEmotion = asyncio.self.llm.send(text)
+        responseAndEmotion = self.llm.send(text)
         if self.isTTS:
             self.try_send_tts(responseAndEmotion)
 
 
     def on_tts_start(self):
         """TTS가 시작될 때 호출되는 콜백 함수"""
+        """팀장이 만들어라해서 TTS담당이 만들긴 했는데, 생각해보니 try_send_tts에서 할거 다하면 이게 굳이 필요가 없어 보인다,,, 쩝;"""
+        pass
         # self.tts_state.publish(True)
-        self.is_tts_running = True
+        # self.is_tts_running = True
 
     def on_tts_done(self):
         """TTS가 끝날 때 호출되는 콜백 함수"""
-        # self.tts_state.publish(False)
+        self.tts_state.publish(False)
         self.is_tts_running = False
         self.sttEnable = True
         self.switch_flag = False
@@ -215,7 +226,7 @@ class Yomi:
         """TTS 상태 확인 후 텍스트 전송"""
         if self.isTTS and not self.is_tts_running:
             self.is_tts_running = True
-            # self.tts_state.publish(True)
+            self.tts_state.publish(True)
             self.tts.send_text(response_text)
         else:
             print("[YOMI] (try_send_tts) TTS가 아직 끝나지 않았습니다. 새 요청 무시.")
@@ -223,7 +234,7 @@ class Yomi:
     def make_yolo_prompt(self):
         """이미지 정보를 문자열로"""
         if not self.lastVision:
-            return "감지된 객체가 없습니다."
+            return "시각정보 : 감지된 것이 없음"
         
         result = []
         for item in self.lastVision:

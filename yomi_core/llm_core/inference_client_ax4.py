@@ -1,10 +1,10 @@
-# yomi_core/llm_core/inference_client_ax4.py
+# yomi_core/llm_core/inference_client_ax4.py "ws://172.27.223.128:8765" localhost:8765
 import asyncio
 import websockets
 import threading
 
 class LLMClient:
-    def __init__(self, uri="ws://172.27.223.128:8765"):
+    def __init__(self, uri="ws://172.27.231.100:8765"):
         self.uri = uri
         self.websocket = None
         
@@ -17,7 +17,8 @@ class LLMClient:
         self.loop.run_forever()
 
     def connect(self):
-        asyncio.run_coroutine_threadsafe(self._connect(), self.loop)
+        future = asyncio.run_coroutine_threadsafe(self._connect(), self.loop)
+        return future.result()
 
     async def _connect(self):
         self.websocket = await websockets.connect(
@@ -37,9 +38,12 @@ class LLMClient:
             print("[LLMClient] 연결 종료")
     
     def send(self, text):
+        if self.websocket is None:
+            self.connect()
+        # print(text)
         future = asyncio.run_coroutine_threadsafe(self._send(text), self.loop)
         return future.result()
-
+    
     async def _send(self, text):
         await self.websocket.send(text)
         response = await self.websocket.recv()
