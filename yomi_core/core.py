@@ -259,6 +259,7 @@ class Yomi:
             vision_copy = list(self.lastVision) if self.lastVision else None
             llm_response = self.llm_response
             llm_emotion_EN = self.llm_emotion_EN
+            mbti = self.mbti
 
         if stt_llm:
             prompt.append(f"청각정보 : {stt_text} \n")
@@ -281,6 +282,7 @@ class Yomi:
         if target == "motor_llm":
             prompt.append(f"LLM_대답 : {llm_response}\n")
             prompt.append(f"LLM_감정 : {llm_emotion_EN}\n")
+            prompt.append(f"MBTI : {mbti}\n")
 
         result = ''.join(prompt)
         
