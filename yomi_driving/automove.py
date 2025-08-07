@@ -188,8 +188,10 @@ class ObstacleAvoider:
         dy = obs_y - self.robot_pose["y"]
         dist = math.hypot(dx, dy)
 
-        if dist == 0:
-            return obs_x, obs_y
+        if dist < 0.05:
+            rospy.loginfo("장애물 위치와 너무 가까워 이동 생략")
+            return None
+
 
         # 단위 벡터
         ux, uy = dx / dist, dy / dist
@@ -221,7 +223,7 @@ class ObstacleAvoider:
         goal.target_pose.header.stamp = rospy.Time.now()
         goal.target_pose.pose.position.x = x
         goal.target_pose.pose.position.y = y
-        goal.target_pose.pose.orientation.w = 1.0  # 방향은 무시 (단순 위치 이동)
+        # goal.target_pose.pose.orientation.w = 1.0  
 
         self.is_moving = True
         self.move_base_client.send_goal(goal)
