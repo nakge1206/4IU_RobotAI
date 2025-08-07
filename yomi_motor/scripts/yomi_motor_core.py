@@ -1,49 +1,49 @@
-import openai
-# from yomi_motion import MotionController
+from openai import OpenAI
 from dotenv import load_dotenv
 import os
 import time
-import sys
-
-sys.path.append(os.path.join(os.path.dirname(__file__), 'stt'))
-sys.path.append(os.path.join(os.path.dirname(__file__), 'tts'))
-sys.path.append(os.path.join(os.path.dirname(__file__), 'llm_core'))
-sys.path.append(os.path.join(os.path.dirname(__file__), 'vision_face'))
-
-current_dir = os.path.dirname(os.path.abspath(__file__))
-base_dir = os.path.abspath(os.path.join(current_dir, "..", ".."))
-
-yomi_STT_path = os.path.join(base_dir, 'stt')
-yomi_TTS_path = os.path.join(base_dir, 'tts')
-yomi_LLM_path = os.path.join(base_dir, 'llm_core')
-yomi_vision_path = os.path.join(base_dir, 'vision_face')
-
-from stt.realtime_stt_module import STTModule        # STT   
-from tts.TTS_server import TTSServer, VITS, TTSClient # TTS
-from vision_face.VisionFace import VisonFaceMain # VISION
-from llm_core.inference_client_ax4 import LLMClient # LLM
+import re
 
 class motorCore:
     def __init__(self):
-        # 환경변수에서 API 키 가져오기
         load_dotenv()
-        openai.api_key = os.getenv("OPENAI_API_KEY")
-
-    def ask_finetuned_model(self, prompt: str) -> str:
-        """Motor LLM 함수"""
-        response = openai.ChatCompletion.create(
-            model="ft:gpt-3.5-turbo-1106:personal::C1YKvB1S",  # 여기는 실제 fine-tune 이름으로
-            messages=[
-                {"role": "system", "content": "당신은 감정과 행동을 분류하는 AI입니다."},
-                {"role": "user", "content": prompt}
-            ]
-        )
-        return response['choices'][0]['message']['content'].strip()
+        api_key = os.getenv("OPENAI_API_KEY")
+        self.client = OpenAI(api_key=api_key)
+        
+    def ask_finetuned_model(self, prompt):
+        print("[yomi_motor_core] (ask_finetuned_model) 실행됨.")
+        try:
+            character_info = (
+                "당신은 감정과 행동을 분류하는 AI입니다."
+                "사용자가 입력한 정보를 바탕으로 아래 함수 중 하나를 정확히 반환하십시오"
+                #"또한 입력한 정보에서 MBTI가 I로 시작할시 I로 시작하는 함수에서 E로 시작힐시는 E로 시작하는 함수에서 찾으십시오."
+                "함수: I_joy1, I_joy2, I_joy3,"
+                "I_trust1, I_trust2, I_trust3,"
+                "I_fear1, I_fear2, I_fear3,"
+                "I_surprise1, I_surprise2, I_surprise3, "
+                "I_sadness1, I_sadness2, I_sadness3,"
+                "I_disgust1, I_disgust2, I_disgust3,"
+                "I_anger1, I_anger2, I_anticipation1, I_anticipation2, I_anticipation3,"
+                "E_joy1, E_joy2, E_joy3, E_trust1, E_trust2, E_trust3, E_fear1, E_fear2, E_fear3"
+                "E_surprise1, E_surprise2, E_surprise3, E_sadness1, E_sadness2, E_sadness3"
+                "E_disgust1, E_disgust2, E_disgust3, E_anger1, E_anger2"
+                "E_anticipation1, E_anticipation2, E_anticipation3"
+            )
+            response = self.client.chat.completions.create(
+                model="ft:gpt-3.5-turbo-1106:personal::C1YKvB1S",
+                messages=[
+                    {"role": "system", "content": character_info},
+                    {"role": "user", "content": prompt}
+                ],
+                timeout=1.3
+            )
+            print("[yomi_motor_core] (ask_finetuned_model) 대답 받았음.")
+            return response.choices[0].message.content.strip()
+        except Exception as e:
+            print("[yomi_motor_core] (ask_finetuned_model) 오류 발생:", e)
+            return "I_surprise1"
 
     def run_motion_from_gpt(self):
-        """main에서 디버깅용으로 무한반복 하는 함수"""
-        # controller = MotionController()
-
         while True:
             print("\n--- GPT 입력 포맷 예시 ---")
             print("emotion: disgust\nvisionDetect: none\nswitchState: 0 0 0 0 0 0\nMBTI: INFP\nspeech: 싫어! 가까이 가지 마.\nresponse: 멀리 가자.")
@@ -53,21 +53,17 @@ class motorCore:
             if user_input.lower() == "exit":
                 break
 
-            # speech 항목 확인
-            speech_value = None
-            for line in user_input.split("\n"):
-                if line.strip().lower().startswith("speech:"):
-                    speech_value = line.split(":", 1)[1].strip()
-                    break
+            # speech 항목 추출
+            speech_match = re.search(r"speech:\s*(.*?)\s*response:", user_input, re.IGNORECASE)
+            speech_value = speech_match.group(1).strip() if speech_match else None
 
             try:
-                if not speech_value:  # speech가 없거나 비어있으면
+                if not speech_value:
                     func_name = "wait_command"
                     print("[INFO] speech가 감지되지 않아 'wait_command' 함수로 대체합니다.")
                 else:
                     func_name = self.ask_finetuned_model(user_input)
                     print(f"[GPT 결과] 함수명: {func_name}")
-
             except Exception as e:
                 print(f"[예외 발생] {e}")
 

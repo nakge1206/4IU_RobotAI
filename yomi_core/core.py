@@ -13,7 +13,6 @@ import json
 import rospy, rosgraph
 from std_msgs.msg import String, Bool
 
-
 # 모듈 경로 추가
 sys.path.append(os.path.join(os.path.dirname(__file__), 'stt'))
 sys.path.append(os.path.join(os.path.dirname(__file__), 'llm_core'))
@@ -32,9 +31,10 @@ from tts.TTS_server import TTSServer, VITS, TTSClient   #TTS
 from vision_face.VisionFace import VisonFaceMain        #Vision
 from llm_core.inference_client_ax4 import LLMClient     #LLM
 from yomi_motor_core import motorCore                   #Motor_LLM
-from yomi_motion import MotionController  #MotionController
+from yomi_motion import MotionController                #MotionController
 # from yomi_motor.scripts.yomi_motor_core import motorCore#Motor
 # from yomi_motor.scripts.yomi_motion import MotionController
+
 
 class Yomi:
     def __init__(self, isSTT=True, isTTS=True, isLLM=True, isVisionFace=True, mbti="I"):
@@ -44,6 +44,10 @@ class Yomi:
         self.isVisionFace = isVisionFace
         self.mbti = mbti
         self.lock = threading.Lock()
+
+        if not rospy.core.is_initialized():
+            rospy.init_node('motion_controller_node', anonymous=True)
+        self.executor = MotionSequenceExecutor()
 
         #STT Timeout
         self.stt_timeout = 20 if mbti == "e" else 30  #stt_timeout-몇 초마다 Vision으로 LLM실행하는지
@@ -92,10 +96,10 @@ class Yomi:
         print(f"[YOMI] TTSClient : 준비완료 ({isTTS})")
         self.llm = LLMClient() if isLLM else None
         print(f"[YOMI] LLM : 준비완료 ({isLLM})")
-        self.VisionFace = VisonFaceMain(interval=2, on_vision_callback=self.handle_vision, viewGUI=True) if isVisionFace else None
+        self.VisionFace = VisonFaceMain(interval=2, on_vision_callback=self.handle_vision, viewGUI=False) if isVisionFace else None
         print(f"[YOMI] VisionFace : 준비완료 ({isVisionFace})")
         self.motor_core = motorCore()
-        self.motor_controller = MotionController()
+        self.motor_controller = MotionController(self.VisionFace)
         
         #ROS
         try:
@@ -186,6 +190,7 @@ class Yomi:
     def _vision_open(self):
         #todo : 여기서 고개 돌아다니면서 확인하는 모션 함수 추가하면 될듯
         self.visionEnable = True
+        self.motor_controller.wait_command()
 
     def handle_vision(self, visionText=None):
         """STT N초 이상 안들어오면 vision 정보 활용"""
@@ -272,13 +277,15 @@ class Yomi:
         if stt_llm:
             prompt.append(f"청각정보 : {stt_text} \n")
         if switch_llm:
-            prompt.append(f"스위치 입력 : {switch_position} 부위가 눌림 \n")
+            prompt.append(f"스위치 입력 : {switch_position} 부위를 강타당함. \n")
         
         if not vision_copy:
-            return "시각정보 : 감지된 것이 없음"
-        for item in vision_copy:
-            label = item['label']
-            prompt.append(f"시각정보 : {label}이 있습니다.\n")
+            prompt.append("시각정보 : 감지된 것이 없음\n")
+        else:
+            for item in vision_copy:
+                label = item['label']
+                prompt.append(f"시각 정보 : {label}이 있습니다.\n")
+
             """
             # 해당 부분은 좌표 정보 포함임. 필요하면 주석해제서 사용
             box = item['box']
@@ -288,6 +295,10 @@ class Yomi:
             """
     
         if target == "motor_llm":
+            if not stt_llm:
+                prompt.append(f"청각정보 : 아무말도 듣지 않았습니다.\n")
+            if not switch_llm:
+                prompt.append(f"스위치 입력 : (0, 0, 0, 0, 0, 0)\n")
             prompt.append(f"LLM_대답 : {llm_response}\n")
             prompt.append(f"LLM_감정 : {llm_emotion_EN}\n")
             prompt.append(f"MBTI : {mbti}\n")
@@ -323,23 +334,24 @@ class Yomi:
                 self.llm_response = "LLM이 이상해"
                 self.llm_emotion_KO = "no"
                 self.llm_emotion_EN = "no"
-
         self.handle_motor_llm(self.make_prompt("motor_llm"))
 
+    def handle_motor_llm(self, text):
+        """모터 관련 LLM 처리"""
+        print(f"[YOMI] (handle_motor_llm) MOTOR_LLM 실행됨")
+        func_name = self.motor_core.ask_finetuned_model(text)
+        print(f"[YOMI] (handle_motor_llm) MOTOR_LLM 결과 : {func_name}")
+
+        #얼굴이랑 TTS에 정보전달
         if self.isVisionFace:
             with self.lock:
                 emotion_en = self.llm_emotion_EN
             self.VisionFace.face_set_emotion(emotion_en)
-
         if self.isTTS:
             with self.lock:
                 response_text = self.llm_response
             self.try_send_tts(response_text)
 
-    def handle_motor_llm(self, text):
-        """모터 관련 LLM 처리"""
-        func_name = self.motor_core.ask_finetuned_model(text)
-        print(f"[YOMI] (handle_motor_llm) MOTOR_LLM 결과 : {func_name}")
         if hasattr(self.motor_controller, func_name):
             func = getattr(self.motor_controller, func_name)
             print(f"[YOMI] [hadle_motor_llm] '{func_name}' 함수실행.")
@@ -349,6 +361,7 @@ class Yomi:
                 print(f"[YOMI] [hadle_motor_llm] Warning :'{func_name}'은 함수가 아닙니다.")
         else:
             print(f"[[YOMI] [hadle_motor_llm] Warning : MotionController에 '{func_name}' 함수 없음.")
+        self.motor_controller.finger_end()
         self.stt_llm = False
         self.switch_llm = False
 

@@ -253,12 +253,14 @@ class MotionSequenceExecutor:
     #             rospy.logwarn(f"❌ Invalid servo_id: {servo_id}")
 
     def request_all_data(self):
+        """모터의 현재값 요청"""
         self.motor_speed_request_pub.publish(Int16MultiArray(data=[]))
         self.motor_position_request_pub.publish(Int16MultiArray(data=[]))
         self.servo_angle_request_pub.publish(Int16MultiArray(data=[]))
 
     def motor_callback(self, msg, index):
         """
+        현재 모터값들 상태 받아오는 콜백함수
         index : 
             1 = MoterSpeed
             2 = MotorPosition

@@ -14,8 +14,8 @@ class ObstacleAvoider:
         """
         노드 초기화 및 주요 변수 선언, 센서 구독, move_base 액션 서버 연결 등 초기 설정 수행
         """
-        if __init__(self, init_node=False):
-            rospy.init_node("go_to_obstacle_node")
+        #if __init__(self, init_node=False):
+        #   rospy.init_node("go_to_obstacle_node")
 
         self.latest_scan = None   # 최신 LaserScan 데이터
         self.robot_pose = {"x": 0.0, "y": 0.0, "yaw": 0.0}  # 오도메트리 기반 로봇 위치 정보
@@ -38,7 +38,7 @@ class ObstacleAvoider:
         self.tf_listener = tf.TransformListener()
 
         rospy.sleep(2.0)  # 초기 TF 및 센서 수신 대기
-        rospy.Timer(rospy.Duration(5.0), self.check_and_move)  # 5초 주기로 장애물 확인 및 이동
+        # rospy.Timer(rospy.Duration(5.0), self.check_and_move)  # 5초 주기로 장애물 확인 및 이동
 
 
     def map_callback(self, msg):

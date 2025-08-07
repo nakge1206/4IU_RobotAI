@@ -13,11 +13,10 @@ sys.path.append(yomi_driving_path)
 
 
 import rospy
-from std_msgs.msg import String, Int16MultiArray
+from std_msgs.msg import Int16MultiArray
 from yomi_motor import MotionSequenceExecutor
 from move import DistanceMover
 from automove import ObstacleAvoider
-import threading
 
 class MotionController:
     def __init__(self, vision = None):
@@ -35,47 +34,49 @@ class MotionController:
         self.vision_detect.clear()
         self.vision_location.clear()
         for item in detects:
-            self.vision_detect.append = item['label']
+            self.vision_detect.append(item['label'])
             box = item['box']
             center_x = (box[0] + box[2])/2
             center_y = (box[1] + box[3]) / 2
             self.vision_location.append((center_x, center_y))
-        if self.vision_location:
-            return self.vision_location[0][0]
-        else:
-            return None
 
-
-
-    def frontal(self, vision):
+    def frontal(self):
         # 로봇이 정면을 바라볼 때 우선 detect 되는 애가 있으면 발동을 하는 것이기에 이것은 정면을 봐야하는 다른 동작이 있을 시 그 동작 내에 if문을 추가해서 이 함수를 발동 시키게 하는게 맞는 거 같다.
         # 로봇은 우선 좌표를 받아왔으니 정면을 보게 한다. 그 이후 이미 저장된 좌표로 움직이면 되니
 
-        max_attempts = 100
+        max_attempts = 10
         attempts = 0
 
         # 정확한 값 말고 오차범위 상정
         while attempts < max_attempts:
-            coordinate_x = self._vision_information()
+            self._vision_information()
+            coordinate_x = self.vision_location
 
             if coordinate_x is None:
                 break
-            if 315 <= coordinate_x <= 325:
+            if 260 <= coordinate_x <= 380:
                 break
 
-            if coordinate_x < 315:
+            if coordinate_x < 260:
                 self.mover.rotate_in_place(5)
-            elif coordinate_x > 325:
+            elif coordinate_x > 380:
                 self.mover.rotate_in_place(-5)
             rospy.sleep(0.3)
             attempts += 1
 
     def wait_command(self):
-        for i in range(3):
-            self.executor.motor_publisher_batch(motor_ids=[12], motor_positions=[130], motor_speeds=[5])
-            rospy.sleep(0.2)
-            self.executor.motor_publisher_batch(motor_ids=[12], motor_positions=[230], motor_speeds=[5])
-            rospy.sleep(0.2)
+        self.executor.motor_publisher_batch(motor_ids=[12], motor_positions=[130], motor_speeds=[7])
+        rospy.sleep(0.2)
+        self.executor.motor_publisher_batch(motor_ids=[12], motor_positions=[230], motor_speeds=[7])
+        rospy.sleep(0.2)
+        self.executor.motor_publisher_batch(motor_ids=[12], motor_positions=[180], motor_speeds=[7])
+
+    def finger_end(self):
+        self.executor.motor_publisher_batch(servo_ids=[2], servo_angles=[120])
+        rospy.sleep(0.2)
+        self.executor.motor_publisher_batch(servo_ids=[2], servo_angles=[130])
+
+    
 
 
     def stand(self):
@@ -143,7 +144,8 @@ class MotionController:
         "신뢰하는 사용자 옆에서 따라다님"
         self.defalt_motion()
         self.frontal()
-        detect = self._vision_information()
+        self._vision_information()
+        detect = self.vision_detect
         if detect == "people":
             obs = self.automover.get_obstacle_position(threshold=2.0)
             if obs is None:
@@ -172,7 +174,8 @@ class MotionController:
         "신뢰하는 사용자 뒤로 숨는다"
         self.defalt_motion()
         self.frontal()
-        detect = self._vision_information()
+        self._vision_information()
+        detect = self.vision_detect
         if detect == "people":
             obs = self.automover.get_obstacle_position(threshold=2.0)
             if obs is None:
@@ -324,7 +327,8 @@ class MotionController:
         "/신뢰대상에게 일정거리 유지하며 옆에 선다."
         self.defalt_motion()
         self.frontal()
-        detect = self._vision_information()
+        self._vision_information()
+        detect = self.vision_detect
         if detect == "people":
             obs = self.automover.get_obstacle_position(threshold=2.0)
             if obs is None:
@@ -339,7 +343,8 @@ class MotionController:
         "일정거리 유지하며 따라다닌다."
         self.defalt_motion()
         self.frontal()
-        detect = self._vision_information()
+        self._vision_information()
+        detect = self.vision_detect
         while detect == "people":
             obs = self.automover.get_obstacle_position(threshold=2.0)
             if obs is None:
@@ -365,7 +370,8 @@ class MotionController:
         "신뢰하는 사용자 뒤로 숨는다."
         self.defalt_motion()
         self.frontal()
-        detect = self._vision_information()
+        self._vision_information()
+        detect = self.vision_detect
         if detect == "people":
             obs = self.automover.get_obstacle_position(threshold=2.0)
             if obs is None:
@@ -428,7 +434,8 @@ class MotionController:
     def E_disgust1(self):
         "원치 않은 사용자 접근 시 후진"
         self.defalt_motion()
-        detect = self._vision_information()
+        self._vision_information()
+        detect = self.vision_detect
         if detect == "people":
             self.mover.move_backward(1.5)
             rospy.sleep(0.2)

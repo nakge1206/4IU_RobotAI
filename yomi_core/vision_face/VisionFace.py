@@ -69,7 +69,7 @@ class YomiFace(QWidget):
 
 
 class FaceController(QObject):
-
+    emotion_changed = pyqtSignal(str)
     def __init__(self, mbti = "I"):
         super().__init__()
         self.gui = None  # GUI 객체를 받아서 제어
@@ -77,6 +77,8 @@ class FaceController(QObject):
 
         self.emotions = ["joy", "sadness", "angry", "fear", "surprise", "disgust", "trust", "anticipation"]
         self.emotion_index = 0
+
+        self.emotion_changed.connect(self.set_emotion)
 
         self.script_dir = os.path.dirname(os.path.abspath(__file__))
         self.image_paths = self._load_image_paths()
@@ -235,6 +237,7 @@ class VisonFaceMain:
 
         self.controller_thread = QThread()
         self.controller = FaceController(mbti)
+        self.controller.initialize(self.face)
         self.controller.moveToThread(self.controller_thread)
         self.controller_thread.started.connect(lambda: self.controller.initialize(self.face))
         self.controller_thread.start()
@@ -285,7 +288,8 @@ class VisonFaceMain:
 
     def face_set_emotion(self, emotion: str):
         """감정 변경"""
-        self.controller.set_emotion(emotion)
+        self.controller.emotion_changed.emit(emotion)
+        # self.controller.set_emotion(emotion)
 
     def run(self):
         """실행"""

@@ -113,9 +113,16 @@ class TTSServer:
             s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             s.bind((self.host, self.port))
             s.listen()
+            print(f"[TTS] [Server] {self.host}:{self.port} 서버 실행 중...")
             while True:
-                conn, addr = s.accept()
-                self._handle_client(conn, addr)
+                try:
+                    conn, addr = s.accept()
+                    self._handle_client(conn, addr)
+                except socket.timeout:
+                    continue  # 무시하고 다시 accept 대기
+                except Exception as e:
+                    print(f"[TTS] [Server] 예외 발생: {e}")
+                    continue
 
     def _handle_client(self, conn, addr):
         try:
