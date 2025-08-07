@@ -153,7 +153,7 @@ class MotionController:
 
             target_x, target_y = self.automover.get_relative_position(obs_x, obs_y, offset = 0.5, direction = "right")
 
-            self.automober.move_to_goal(target_x, target_y)
+            self.automover.move_to_goal(target_x, target_y)
 
     def I_trust2(self):
         "/사용자 지시가 있으면 즉각 응답 및 행동을 수행"
@@ -163,6 +163,10 @@ class MotionController:
 
     def I_fear1(self):
         "(위협 감지시)모서리로 움직인다 벽을 보고 선다"
+        self.defalt_motion()
+        self.defalt_motion2()
+        self.automover.get_nearest_wall()
+        self.automover.go_to_nearest_wall()
         
     def I_fear2(self):
         "신뢰하는 사용자 뒤로 숨는다"
@@ -352,6 +356,10 @@ class MotionController:
     
     def E_fear1(self):
         "(위협감지 시)모서리로 움직인다 벽을 보고 선다."
+        self.defalt_motion()
+        self.defalt_motion2()
+        self.automover.get_nearest_wall()
+        self.automover.go_to_nearest_wall()
     
     def E_fear2(self):
         "신뢰하는 사용자 뒤로 숨는다."
