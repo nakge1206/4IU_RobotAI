@@ -3,6 +3,25 @@ import openai
 from dotenv import load_dotenv
 import os
 import time
+import sys
+
+sys.path.append(os.path.join(os.path.dirname(__file__), 'stt'))
+sys.path.append(os.path.join(os.path.dirname(__file__), 'tts'))
+sys.path.append(os.path.join(os.path.dirname(__file__), 'llm_core'))
+sys.path.append(os.path.join(os.path.dirname(__file__), 'vision_face'))
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+base_dir = os.path.abspath(os.path.join(current_dir, "..", ".."))
+
+yomi_STT_path = os.path.join(base_dir, 'stt')
+yomi_TTS_path = os.path.join(base_dir, 'tts')
+yomi_LLM_path = os.path.join(base_dir, 'llm_core')
+yomi_vision_path = os.path.join(base_dir, 'vision_face')
+
+from stt.realtime_stt_module import STTModule        # STT   
+from tts.TTS_server import TTSServer, VITS, TTSClient # TTS
+from vision_face.VisionFace import VisonFaceMain # VISION
+from llm_core.inference_client_ax4 import LLMClient # LLM
 
 class motorCore:
     def __init__(self):
@@ -13,7 +32,7 @@ class motorCore:
     def ask_finetuned_model(self, prompt: str) -> str:
         """Motor LLM 함수"""
         response = openai.ChatCompletion.create(
-            model="ft:gpt-3.5-turbo-0613:your-org:your-model-name",  # 여기는 실제 fine-tune 이름으로
+            model="ft:gpt-3.5-turbo-1106:personal::C1YKvB1S",  # 여기는 실제 fine-tune 이름으로
             messages=[
                 {"role": "system", "content": "당신은 감정과 행동을 분류하는 AI입니다."},
                 {"role": "user", "content": prompt}
