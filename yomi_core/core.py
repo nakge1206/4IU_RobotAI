@@ -45,10 +45,6 @@ class Yomi:
         self.mbti = mbti
         self.lock = threading.Lock()
 
-        if not rospy.core.is_initialized():
-            rospy.init_node('motion_controller_node', anonymous=True)
-        self.executor = MotionSequenceExecutor()
-
         #STT Timeout
         self.stt_timeout = 20 if mbti == "e" else 30  #stt_timeout-몇 초마다 Vision으로 LLM실행하는지
         self.sttTimer = None
@@ -96,7 +92,7 @@ class Yomi:
         print(f"[YOMI] TTSClient : 준비완료 ({isTTS})")
         self.llm = LLMClient() if isLLM else None
         print(f"[YOMI] LLM : 준비완료 ({isLLM})")
-        self.VisionFace = VisonFaceMain(interval=2, on_vision_callback=self.handle_vision, viewGUI=False) if isVisionFace else None
+        self.VisionFace = VisonFaceMain(interval=2, on_vision_callback=self.handle_vision, viewGUI=False, mbti=self.mbti) if isVisionFace else None
         print(f"[YOMI] VisionFace : 준비완료 ({isVisionFace})")
         self.motor_core = motorCore()
         self.motor_controller = MotionController(self.VisionFace)
@@ -131,7 +127,8 @@ class Yomi:
         if self.isTTS:
             threading.Thread(target=self.tts_server.run, daemon=True).start()
         if self.isLLM:
-            threading.Thread(target=self.llm.connect, daemon=True).start()
+            self.llm.connect()
+            # threading.Thread(target=self.llm.connect, daemon=True).start()
         if self.isVisionFace:
             self.VisionFace.run()
 
@@ -181,7 +178,12 @@ class Yomi:
             self.switch_llm = False
 
         if self.isLLM:
-            self.handle_main_llm(self.make_prompt("main_llm"))
+            threading.Thread(
+                target=self.handle_main_llm, 
+                args=(self.make_prompt("main_llm"),),
+                daemon=True
+            ).start()
+            # self.handle_main_llm(self.make_prompt("main_llm"))
         
         #STT Timeout 재설정
         self.sttTimer = threading.Timer(self.stt_timeout, self._vision_open)
@@ -225,12 +227,12 @@ class Yomi:
         state = True if msg.data else False
         if state:
             touch_map = {
-                0: "등",
-                1: "왼팔",
-                2: "오른팔",
-                3: "왼손",
-                4: "오른손",
-                5: "머리"
+                1: "등",
+                2: "왼팔",
+                3: "오른팔",
+                4: "왼손",
+                5: "오른손",
+                6: "머리"
             }
             if index in touch_map:
                 print(f"[YOMI] (handle_switch) 눌린 부위: {touch_map[index]} (switch={index}) \n")
@@ -406,7 +408,7 @@ class Yomi:
     #     return ', '.join(result)
 
 if __name__ == "__main__":
-    service = Yomi(isSTT=True, isLLM=True, isTTS=True, isVisionFace=True)
+    service = Yomi(isSTT=True, isLLM=True, isTTS=True, isVisionFace=True, mbti="E")
 
     service.start()
 

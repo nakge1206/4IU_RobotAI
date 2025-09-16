@@ -63,7 +63,7 @@ class DistanceMover:
 
     def rotate_in_place(self, angle_deg):
         """제자리에서 회전 (양수=왼쪽, 음수=오른쪽)"""
-        angular_speed = self.speed  # rad/s
+        angular_speed = 1.5  # rad/s
         duration = (abs(angle_deg) * math.pi / 180) / angular_speed
         if angle_deg > 0:
             self.send_motion(angular_z=+angular_speed, duration=duration)
