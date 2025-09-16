@@ -75,7 +75,7 @@ class FaceController(QObject):
         self.gui = None  # GUI 객체를 받아서 제어
         self.mbti = mbti
 
-        self.emotions = ["joy", "sadness", "angry", "fear", "surprise", "disgust", "trust", "anticipation"]
+        self.emotions = ["joy", "sadness", "angry", "fear", "surprise", "disgust", "trust", "anticipation", "no"]
         self.emotion_index = 0
 
         self.emotion_changed.connect(self.set_emotion)
@@ -136,9 +136,12 @@ class FaceController(QObject):
         """무표정트리커 활성화 되면, 3초후 출력"""
         if self.no_face_trigger_time and time.time() >= self.no_face_trigger_time:
             self.no_face_trigger_time = None
-            gif_path = os.path.join(self.script_dir, 'face', f"{self.mbti}_no.gif")
-            if os.path.exists(gif_path) and self.gui:
-                self.gui.set_emotion_movie(gif_path)
+            # gif_path = os.path.join(self.script_dir, 'face', f"{self.mbti}_no.gif")
+            # if os.path.exists(gif_path) and self.gui:
+            #     self.gui.set_emotion_movie(gif_path)
+            if self.gui:
+                self.emotion_index = self.emotions.index("no")
+                self.update_emotion()
                 print("[VisionFace] [FaceController] (handle_tts) 감정 설정 : 무표정")
     
     # def _delayed_no_face(self):
