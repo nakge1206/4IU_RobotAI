@@ -39,10 +39,22 @@ peft_config = LoraConfig(
 model = get_peft_model(model, peft_config)
 
 # 3. 데이터셋 로딩
-dataset = load_dataset("json", data_files="baek.jsonl", split="train")
+dataset = load_dataset("json", data_files="new_dataset.jsonl", split="train")
 
 def tokenize_function(example):
-    full_prompt = f"""[INSTRUCTION] {example['instruction']} [RESPONSE] {example['output']}"""
+    # input dict를 문자열로 변환
+    input_str = ""
+    if isinstance(example["input"], dict):
+        parts = []
+        for k, v in example["input"].items():
+            parts.append(f"{k}: {v}")
+        input_str = " | ".join(parts)
+    else:
+        input_str = str(example["input"])
+
+    # 최종 프롬프트
+    full_prompt = f"""[INSTRUCTION] {example['instruction']} [INPUT] {input_str} [RESPONSE] {example['output']}"""
+    
     tokenized = tokenizer(full_prompt, truncation=True, padding="max_length", max_length=512)
     tokenized["labels"] = tokenized["input_ids"].copy()
     return tokenized
@@ -54,7 +66,7 @@ output_dir = f"./ax4_lora_finetune_{datetime.datetime.now().strftime('%Y%m%d_%H%
 
 training_args = TrainingArguments(
     output_dir=output_dir,
-    per_device_train_batch_size=1,
+    per_device_train_batch_size=4,
     num_train_epochs=5,
     learning_rate=1e-4,
     weight_decay=0.01,
@@ -63,8 +75,8 @@ training_args = TrainingArguments(
     save_strategy="epoch",
     report_to="none",
     remove_unused_columns=False,
-    no_cuda=True  # CPU 전용
-)
+    no_cuda=False
+    )
 
 trainer = Trainer(
     model=model,
