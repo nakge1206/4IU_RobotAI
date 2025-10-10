@@ -6,6 +6,7 @@ import random
 import time
 import re
 import json
+from typing import Dict, List, Optional, Callable, Any
 
 # import asyncio
 
@@ -21,7 +22,9 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'vision_face'))
 current_dir = os.path.dirname(os.path.abspath(__file__))
 base_dir = os.path.abspath(os.path.join(current_dir, ".."))
 yomi_driving_path = os.path.join(base_dir, "yomi_motor/scripts")
+yomi_motor_path = os.path.join(base_dir, "yomi_motor")
 sys.path.append(yomi_driving_path)
+sys.path.append(yomi_motor_path)
 # sys.path.append(os.path.abspath('./yomi_motor'))
 
 
@@ -32,6 +35,7 @@ from vision_face.VisionFace import VisonFaceMain        #Vision
 from llm_core.inference_client_ax4 import LLMClient     #LLM
 from yomi_motor_core import motorCore                   #Motor_LLM
 from yomi_motion import MotionController                #MotionController
+from yomi_motor import EmotionJsonPicker               #MotionPicker
 # from yomi_motor.scripts.yomi_motor_core import motorCore#Motor
 # from yomi_motor.scripts.yomi_motion import MotionController
 
@@ -46,7 +50,7 @@ class Yomi:
         self.lock = threading.Lock()
 
         #STT Timeout
-        self.stt_timeout = 20 if mbti == "e" else 30  #stt_timeout-몇 초마다 Vision으로 LLM실행하는지
+        self.stt_timeout = 20 if mbti.lower() == "e" else 30  #stt_timeout-몇 초마다 Vision으로 LLM실행하는지
         self.sttTimer = None
         self.visionEnable = False
 
@@ -92,6 +96,9 @@ class Yomi:
         print(f"[YOMI] TTSClient : 준비완료 ({isTTS})")
         self.llm = LLMClient() if isLLM else None
         print(f"[YOMI] LLM : 준비완료 ({isLLM})")
+        self.motionPicker = EmotionJsonPicker(on_key_reset=None, seed=42)
+        print(f"[YOMI] MotionPicker : 준비완료")
+        print("▶ initial counts:", self.motionPicker.counts())
         self.VisionFace = VisonFaceMain(interval=2, on_vision_callback=self.handle_vision, viewGUI=False, mbti=self.mbti) if isVisionFace else None
         print(f"[YOMI] VisionFace : 준비완료 ({isVisionFace})")
         self.motor_core = motorCore()
@@ -315,7 +322,11 @@ class Yomi:
     
     def handle_main_llm(self, text):
         """메인 LLM 처리"""
+
+        #대답 및 감정 추출
         responseAndEmotion = self.llm.send(text)
+
+        # 감정 맵핑
         emotion_map = {
             "화남": "angry",
             "기대": "anticipation",
@@ -323,7 +334,9 @@ class Yomi:
             "공포": "fear",
             "기쁨": "joy",
             "슬픔": "sadness",
-            "놀람": "surprise"
+            "놀람": "surprise",
+            "신뢰": "trust",
+            "무감정": "no"
         }
         match = re.search(r'"대답":\s*(.*?)\s*"감정":\s*(.*)', responseAndEmotion, re.S)
         with self.lock:
@@ -336,13 +349,6 @@ class Yomi:
                 self.llm_response = "LLM이 이상해"
                 self.llm_emotion_KO = "no"
                 self.llm_emotion_EN = "no"
-        self.handle_motor_llm(self.make_prompt("motor_llm"))
-
-    def handle_motor_llm(self, text):
-        """모터 관련 LLM 처리"""
-        print(f"[YOMI] (handle_motor_llm) MOTOR_LLM 실행됨")
-        func_name = self.motor_core.ask_finetuned_model(text)
-        print(f"[YOMI] (handle_motor_llm) MOTOR_LLM 결과 : {func_name}")
 
         #얼굴이랑 TTS에 정보전달
         if self.isVisionFace:
@@ -353,6 +359,21 @@ class Yomi:
             with self.lock:
                 response_text = self.llm_response
             self.try_send_tts(response_text)
+
+        #감정에 맞는 행동 실행
+        entry = self.motionPicker.pick(self.llm_emotion_EN)
+        print(f"[YOMI] (handle_main_llm) MotionPicker 선택: "
+        f"name={entry.get('name')} "
+        f"path={entry.get('path')} "
+        f"steps={len(entry.get('data', []))}")
+    
+
+
+    def handle_motor_llm(self, text):
+        """모터 관련 LLM 처리"""
+        print(f"[YOMI] (handle_motor_llm) MOTOR_LLM 실행됨")
+        func_name = self.motor_core.ask_finetuned_model(text)
+        print(f"[YOMI] (handle_motor_llm) MOTOR_LLM 결과 : {func_name}")
 
         if hasattr(self.motor_controller, func_name):
             func = getattr(self.motor_controller, func_name)

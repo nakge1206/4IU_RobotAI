@@ -31,12 +31,7 @@ class MotionSequenceExecutor:
 
         #Subscriber
         # rospy.Subscriber('/play_motion_sequence', String, self.handle_sequence_request)
-        # rospy.Subscriber('/switch_1_state', Bool, self.switch_callback, callback_args=1)
-        # rospy.Subscriber('/switch_2_state', Bool, self.switch_callback, callback_args=2)
-        # rospy.Subscriber('/switch_3_state', Bool, self.switch_callback, callback_args=3)
-        # rospy.Subscriber('/switch_4_state', Bool, self.switch_callback, callback_args=4)
-        # rospy.Subscriber('/switch_5_state', Bool, self.switch_callback, callback_args=5)
-        # rospy.Subscriber('/switch_6_state', Bool, self.switch_callback, callback_args=6)
+
         self.motor_id = 3
         self.motor_speed = 2
         self.motor_pos = 180
@@ -71,15 +66,6 @@ class MotionSequenceExecutor:
         
         #자율주행
         # self.goal_pub = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=10)
-        
-
-        # # 객체 인식 -> 목표 위치 -> 특정 시퀀스 실행
-        # self.target_map = {
-        #     "person": ((1.0, 2.0, 90), "/home/micca/catkin_ws/src/yomi/motion/hi")
-        #     #"bottle": ((2.5, 0.5, 180), "/home/micca/catkin_ws/src/yomi/motion/hi"),
-        #     #"cup": ((0.5, -1.0, 0), "/home/micca/catkin_ws/src/yomi/motion/hi")
-        # }
-        # self.sent_labels = set()
 
         rospy.loginfo("✅ Main Core Node with Object Navigation Initialized")
         # rospy.spin()
@@ -146,71 +132,6 @@ class MotionSequenceExecutor:
 
     #         except Exception as e:
     #             rospy.logerr(f"❌ Error executing motion block: {e}")
-
-    # def switch_callback(self, msg, index):
-    #     """
-    #     yomi몸에 달려있는 switch눌렸을때 콜백함수
-    #     1: 등
-    #     2: 왼팔
-    #     3: 오른팔
-    #     4: 왼손
-    #     5: 오른손
-    #     6: 머리
-
-    #     1: 등 - 정보출력
-    #     2: 왼팔 - pos+1
-    #     3: 오른팔 - pos-1
-    #     4: 왼손 - pos+5
-    #     5: 오른손 - pos-5
-    #     6: 머리 - motor변경
-    #     """
-    #     if not msg.data:
-    #         return  # 버튼 떼면 무시
-    #     state = True if msg.data else False
-    #     if state:
-    #         rospy.loginfo(f"Switch {index} if {str(state)}")
-        
-    #     if index == 1:
-    #         self.request_all_data()
-
-        # elif index == 6:
-        #     # 모터 변경
-        #     self.motor_id = 3 if self.motor_id == 12 else self.motor_id + 1
-        #     rospy.loginfo(f"motor_id = {self.motor_id}")
-
-        #     default_positions = {
-        #         3: 180, 7: 120, 
-        #         4: 180, 8: 180,
-        #         5: 180, 9: 240, 
-        #         6: 180, 10: 180, 
-        #         11: 190, 
-        #         12: 180
-        #     }
-        #     self.motor_pos = default_positions.get(self.motor_id)
-        #     rospy.loginfo(f"[기본 위치 설정] motor_id={self.motor_id}, motor_pos={self.motor_pos}")
-
-        # elif index in [2, 3, 4, 5]:
-        #     # 증감량 정의
-        #     delta = {2: 1, 3: -1, 4: 5, 5: -5}.get(index, 0)
-        #     self.motor_pos += delta
-
-        #     # 현재 모터의 범위 제한 적용
-        #     min_pos, max_pos = self.motor_limits.get(self.motor_id, (0, 300))
-        #     if self.motor_pos < min_pos:
-        #         self.motor_pos = min_pos
-        #         rospy.logwarn(f"⬅️ 모터 {self.motor_id} 최소값 {min_pos} 도달")
-        #     elif self.motor_pos > max_pos:
-        #         self.motor_pos = max_pos
-        #         rospy.logwarn(f"➡️ 모터 {self.motor_id} 최대값 {max_pos} 도달")
-
-        #     # 퍼블리시
-        #     self.motor_publisher(
-        #         motor_id=self.motor_id,
-        #         motor_position=self.motor_pos,
-        #         motor_speed=self.motor_speed
-        #     )
-
-
     
     # def motor_publisher(self, motor_id = None, motor_speed = None, motor_position = None, servo_id = None, servo_angle = None):
     #     """
@@ -316,23 +237,42 @@ class MotionSequenceExecutor:
             self.servo_angle_pub.publish(Int16MultiArray(data=angle_data))
 
 
-    #영상처리
-    # def handle_detected_object(self, msg):
-    #     """yolo v5의 detect.py를 실행하면 내부에 rosnode 자동생성되어 /detected_object topic으로 퍼블리시해줌"""
-    #     label = msg.data.strip()
-    #     if label in self.target_map and label not in self.sent_labels:
-    #         (x, y, yaw_deg), sequence_path = self.target_map[label]
+    def execute_sequence_data(self, motion_list):
+        start_time = time.time()
 
-    #         self.tts_queue.put(f"{label} detected")
-            
-    #         self.send_goal(x, y, yaw_deg)
-    #         self.sent_labels.add(label)
+        for idx, motion in enumerate(motion_list):
+            try:
+                # 1) 타이밍 맞추기
+                ts_ms = motion.get("timestamp_ms", 0)
+                timestamp_sec = float(ts_ms) / 1000.0
+                while (time.time() - start_time) < timestamp_sec and not rospy.is_shutdown():
+                    time.sleep(0.001)
 
-    #         # 시퀀스 실행을 위치 도달 후로 지연 (현재는 Duration 으로 지연함. 개발 필요시 도착했는지 토픽 받아서 제어하면 됨)
-    #         rospy.Timer(rospy.Duration(8), lambda event: self.execute_sequence_from_path(sequence_path), oneshot=True)
+                # 2) 데이터 꺼내고 정렬(키가 문자열 숫자일 수 있음)
+                motor_speeds_d    = motion.get("motor_speeds", {})
+                motor_positions_d = motion.get("motor_positions", {})
+                servo_angles_d    = motion.get("servo_angles", {})
 
+                if motor_speeds_d:
+                    motor_ids = sorted(int(k) for k in motor_speeds_d.keys())
+                    motor_speeds = [int(motor_speeds_d[str(k)]) for k in motor_ids]
+                    self.motor_speed_pub.publish(Int16MultiArray(data=motor_speeds))
 
+                if motor_positions_d:
+                    motor_ids = sorted(int(k) for k in motor_positions_d.keys())
+                    motor_positions = [int(motor_positions_d[str(k)]) for k in motor_ids]
+                    self.motor_position_pub.publish(Int16MultiArray(data=motor_positions))
 
+                if servo_angles_d:
+                    servo_ids = sorted(int(k) for k in servo_angles_d.keys())
+                    servo_angles = [int(servo_angles_d[str(k)]) for k in servo_ids]
+                    self.servo_angle_pub.publish(Int16MultiArray(data=servo_angles))
+
+                rospy.loginfo(f"✅ Executed motion[{idx}] @ {ts_ms} ms")
+
+            except Exception as e:
+                rospy.logerr(f"❌ motion[{idx}] 실행 중 오류: {e}")
+                
     # def send_goal(self, x, y, yaw_deg):
     #     """자율주행 파트"""
     #     goal = PoseStamped()
