@@ -1,57 +1,46 @@
-
-import asyncio
-import websockets
-import os
-import sys
-import json
-
-sys.path.append(os.path.dirname(__file__))
+# yomi_core/llm_core/inference_server_ax4.py
+import asyncio, json, websockets
 from llm_responder_ax4 import LLMResponder
 
-llm = LLMResponder(
-    model_path="C:/Users/COM/Desktop/yomi/4IU_RobotAI/yomi_core/llm_core/adapter_ax",
-    adapter_path=None
-)
+responder = None
 
 async def handle_connection(websocket):
+    global responder
     print("[LLM 서버] 클라이언트 연결됨")
-    while True:
-        try:
-            raw_question = await websocket.recv()
-            question, mbti_code = json.loads(raw_question)
-            if mbti_code == "I":
-                mbti = "INFP"
-            elif mbti_code == "E":
-                mbti = "ESTJ"
-            else:
-                mbti = None
-            print(f"[수신] 질문: {question}")
-            if mbti is not None:
-                print(f"[수신] MBTI: {mbti}")
-            else:
-                print("[수신] MBTI 정보 없음")
+    try:
+        async for message in websocket:
+            print("[DEBUG] 수신 원문:", message)
+            try:
+                data = json.loads(message)
+                if isinstance(data, list):  # 리스트 형태일 경우
+                    data = {"text": data[0], "mbti": data[1] if len(data) > 1 else None}
 
-            loop = asyncio.get_event_loop()
-            response = await loop.run_in_executor(None, llm.generate_response, question, None, None, mbti)
+                user_input = data.get("text", "")
+                mbti = data.get("mbti", None)
 
-            await websocket.send(response)
-            print(f"[전송] 응답: {response}")
-        except Exception as e:
-            print(f"[서버 오류] {e}")
-            await websocket.send("❌ 서버 내부 오류 발생")
-            break
+                print(f"[수신] 질문: {user_input}")
+                if mbti:
+                    print(f"[수신] MBTI: {mbti}")
+
+                response = responder.generate_response(user_input, mbti=mbti)
+
+                await websocket.send(response)
+                print(f"[전송] 응답: {response}")
+
+            except Exception as e:
+                print("[서버 오류]", e)
+                if not websocket.closed:
+                    await websocket.send("❌ 서버 내부 오류 발생")
+    except websockets.exceptions.ConnectionClosedOK:
+        print("[서버] 클라이언트 정상 종료")
 
 async def main():
-    server = await websockets.serve(
-        handle_connection,
-        "0.0.0.0",
-        8765,
-        subprotocols=["llm-protocol"],
-        ping_interval=60,      # 수정
-        ping_timeout=60        # 수정
-    )
+    global responder
+    responder = LLMResponder()
     print("[LLM 서버] 시작됨 (ws://0.0.0.0:8765)")
-    await server.wait_closed()
+
+    async with websockets.serve(handle_connection, "0.0.0.0", 8765):
+        await asyncio.Future()
 
 if __name__ == "__main__":
     asyncio.run(main())
