@@ -1,4 +1,4 @@
-# emotion_json_picker.py
+# yomi_motor.py
 import json
 import threading
 from pathlib import Path
@@ -92,6 +92,7 @@ class EmotionJsonPicker:
             used_row[j] = True
             entry = pool_row[j]
             round_done = all(used_row)
+            print(f"[YOMI_MOTOR] (pick) 감정:{key}, idx:{j}")
 
         if round_done:
             self._reset_key_internal(key)

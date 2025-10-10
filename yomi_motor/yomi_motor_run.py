@@ -192,7 +192,7 @@ class MotionSequenceExecutor:
             # rospy.loginfo(f"[motor_callback] Updated curMotorSpeed: {list(msg.data)}")
         elif index == 2:  # 모터 위치
             self.curMotorPos = list(msg.data)
-            rospy.loginfo(f"[motor_callback] Updated curMotorPos: {list(msg.data)}")
+            # rospy.loginfo(f"[motor_callback] Updated curMotorPos: {list(msg.data)}")
         elif index == 3:  # 서보 각도
             self.curServoAngle = list(msg.data)
             # rospy.loginfo(f"[motor_callback] Updated curServoAngle: {list(msg.data)}")
@@ -268,7 +268,7 @@ class MotionSequenceExecutor:
                     servo_angles = [int(servo_angles_d[str(k)]) for k in servo_ids]
                     self.servo_angle_pub.publish(Int16MultiArray(data=servo_angles))
 
-                rospy.loginfo(f"✅ Executed motion[{idx}] @ {ts_ms} ms")
+                # rospy.loginfo(f"[yomi_motor_run] Executed motion[{idx}] @ {ts_ms} ms")
 
             except Exception as e:
                 rospy.logerr(f"❌ motion[{idx}] 실행 중 오류: {e}")

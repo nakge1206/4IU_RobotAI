@@ -35,7 +35,7 @@ from vision_face.VisionFace import VisonFaceMain        #Vision
 from llm_core.inference_client_ax4 import LLMClient     #LLM
 from yomi_motor_core import motorCore                   #Motor_LLM
 from yomi_motion import MotionController                #MotionController
-from yomi_motor import EmotionJsonPicker               #MotionPicker
+from yomi_motor.yomi_motor import EmotionJsonPicker               #MotionPicker
 # from yomi_motor.scripts.yomi_motor_core import motorCore#Motor
 # from yomi_motor.scripts.yomi_motion import MotionController
 
@@ -99,7 +99,7 @@ class Yomi:
         self.motionPicker = EmotionJsonPicker(on_key_reset=None, seed=42)
         print(f"[YOMI] MotionPicker : 준비완료")
         print("▶ initial counts:", self.motionPicker.counts())
-        self.VisionFace = VisonFaceMain(interval=2, on_vision_callback=self.handle_vision, viewGUI=False, mbti=self.mbti) if isVisionFace else None
+        self.VisionFace = VisonFaceMain(interval=2, on_vision_callback=self.handle_vision, viewGUI=True, mbti=self.mbti) if isVisionFace else None
         print(f"[YOMI] VisionFace : 준비완료 ({isVisionFace})")
         self.motor_core = motorCore()
         self.motor_controller = MotionController(self.VisionFace)
@@ -362,12 +362,6 @@ class Yomi:
 
         #감정에 맞는 행동 실행
         entry = self.motionPicker.pick(self.llm_emotion_EN)
-        print(f"[YOMI] (handle_main_llm) MotionPicker 선택: "
-        f"name={entry.get('name')} "
-        f"path={entry.get('path')} "
-        f"steps={len(entry.get('data', []))}")
-    
-
 
     def handle_motor_llm(self, text):
         """모터 관련 LLM 처리"""
