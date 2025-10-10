@@ -129,13 +129,13 @@ class FaceController(QObject):
     
     def handle_tts(self, msg):
         """rostopic(stt_state) 감지해서 True->False일때 실행"""
-        print(f"[VisionFace] [FaceController] (handle_tts) tts변화 감지함 : {msg.data}")
+        # print(f"[VisionFace] [FaceController] (handle_tts) tts변화 감지함 : {msg.data}")
         if self.tts_state and not msg.data:
-            self.no_face_trigger_time = time.time() + 3
+            self.no_face_trigger_time = time.time() + 6
         self.tts_state = msg.data
 
     def check_no_face(self):
-        """무표정트리커 활성화 되면, 3초후 출력"""
+        """무표정트리커 활성화 되면, n초후 출력"""
         if self.no_face_trigger_time and time.time() >= self.no_face_trigger_time:
             self.no_face_trigger_time = None
             # gif_path = os.path.join(self.script_dir, 'face', f"{self.mbti}_no.gif")
@@ -144,7 +144,7 @@ class FaceController(QObject):
             if self.gui:
                 self.emotion_index = self.emotions.index("no")
                 self.update_emotion()
-                print("[VisionFace] [FaceController] (handle_tts) 감정 설정 : 무표정")
+                print("[VisionFace] [FaceController] (check_no_face) 감정 설정 : 무표정")
     
     # def _delayed_no_face(self):
     #     """TTS가 완료되고 나서, 3초 후 무표정 실행"""
@@ -199,11 +199,11 @@ class YoloWorker(threading.Thread):
             if not ret:
                 continue
             #이미지 반전
-            flipped_frame = cv2.flip(frame, -1)
+            # frame = cv2.flip(frame, -1)
 
-            detection = self.detector.ObjectInfomation(flipped_frame)
+            detection = self.detector.ObjectInfomation(frame)
             with self.lock:
-                self.frame = flipped_frame.copy()
+                self.frame = frame.copy()
                 self.detections = detection
             time.sleep(0.01)
 
