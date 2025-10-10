@@ -1,4 +1,3 @@
-# yomi_core/llm_core/inference_client_ax4.py "ws://172.27.223.128:8765" localhost:8765
 import asyncio
 import websockets
 import threading
@@ -38,15 +37,16 @@ class LLMClient:
             await self.websocket.close()
             print("[LLMClient] 연결 종료")
     
-    def send(self, text):
+    def send(self, text, mbti="INFP"):
         if self.websocket is None:
             self.connect()
-        # print(text)
-        future = asyncio.run_coroutine_threadsafe(self._send(text), self.loop)
+        # ✅ 딕셔너리 형태로 전송
+        payload = {"text": text, "mbti": mbti}
+        future = asyncio.run_coroutine_threadsafe(self._send(payload), self.loop)
         return future.result()
     
-    async def _send(self, text):
-        await self.websocket.send(text)
+    async def _send(self, payload):
+        await self.websocket.send(json.dumps(payload, ensure_ascii=False))
         response = await self.websocket.recv()
         return response
 
@@ -68,7 +68,6 @@ class LLMClient:
             self.disconnect()
 
 
-# 비동기 루프 진입
 if __name__ == "__main__":
     client = LLMClient()
     asyncio.run(client.chat_loop())
