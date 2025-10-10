@@ -19,6 +19,8 @@ import cv2
 from ROD_detection import RealtimeObjectDetection
 from ROD_log import DetectionLogger
 
+import random
+
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"  # OpenMP 중복 방지
 
 class YomiFace(QWidget):
@@ -196,9 +198,12 @@ class YoloWorker(threading.Thread):
             #print(frame.shape)
             if not ret:
                 continue
-            detection = self.detector.ObjectInfomation(frame)
+            #이미지 반전
+            flipped_frame = cv2.flip(frame, -1)
+
+            detection = self.detector.ObjectInfomation(flipped_frame)
             with self.lock:
-                self.frame = frame.copy()
+                self.frame = flipped_frame.copy()
                 self.detections = detection
             time.sleep(0.01)
 
@@ -253,6 +258,10 @@ class VisonFaceMain:
         self.running = True
         self.isFPS = isFPS
 
+        self.startTimer = None
+        self.stopTimer = None
+        self.currTimer = None
+
         self.face.keyPressEvent = self.key_handler
         self.app.aboutToQuit.connect(self._quit)
 
@@ -267,6 +276,19 @@ class VisonFaceMain:
             self.controller.next_emotion()
         elif event.key() == Qt.Key_M:
             self.controller.next_mbti()
+        elif event.key() == Qt.Key_D:
+            self.startTimer = time.time()
+            detect = self.vision_get_detections()
+            self.stopTimer = time.time()
+            print(f"객체 : {detect}")
+            print(f"지연율 : {self.stopTimer-self.startTimer}")
+        elif event.key() == Qt.Key_F:
+            emotions = ["joy", "sadness", "angry", "fear", "surprise", "disgust", "trust", "anticipation", "no"]
+            emotion_index = random.randrange(0,8)
+            self.startTimer = time.time()
+            self.face_set_emotion(emotions[emotion_index])
+            self.stopTimer = time.time()
+            print(f"지연율 : {self.stopTimer-self.startTimer}")
         elif event.key() == Qt.Key_Q:
             self.running = False
             self.app.quit()
@@ -302,7 +324,8 @@ class VisonFaceMain:
                 if self.viewGUI:
                     # print(detections)
                     frame = self.yoloWorker.detector.plot_boxes(detections, frame)
-                    frame = cv2.flip(frame, -1)
+                    #카메라 뒤집기
+                    # frame = cv2.flip(frame, -1)
 
                     if self.isFPS:
                         curr_time = time.time()
@@ -324,13 +347,16 @@ class VisonFaceMain:
 
 
 
-
 if __name__ == '__main__':
+    start_time = time.time()
     main = VisonFaceMain(mbti="I")
     try:
         main.run()
     except KeyboardInterrupt:
         main.stop()
         sys.exit(0)
+    end_time = time.time()
+    running_time = end_time - start_time
+    print(f"실행 시간:{running_time:2f}")
 
     
