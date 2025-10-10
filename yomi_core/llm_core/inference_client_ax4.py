@@ -2,9 +2,10 @@
 import asyncio
 import websockets
 import threading
+import json
 
 class LLMClient:
-    def __init__(self, uri="ws://172.27.243.211:8765"):
+    def __init__(self, uri="ws://172.27.179.54:8765"):
         self.uri = uri
         self.websocket = None
         
@@ -53,10 +54,13 @@ class LLMClient:
         self.connect()
         try:
             while True:
-                msg = input("질문 (종료: ㅂㅂ): ")
+                msg = input("질문 (종료: ㅂㅂ): ").strip()
                 if msg.lower() in ['ㅂㅂ', 'exit', 'quit']:
                     break
-                res = self.send(msg)
+                # 필요하면 매번 또는 최초 1회 MBTI 코드 입력
+                mbti_in = input("MBTI 코드 입력 (I/E, 건너뛰기 Enter): ").strip().upper()
+                payload = {"question": msg, "mbti_code": mbti_in}
+                res = self.send(json.dumps(payload, ensure_ascii=False))
                 print("로봇 응답:", res)
         except Exception as e:
             print("[클라이언트 오류]", e)

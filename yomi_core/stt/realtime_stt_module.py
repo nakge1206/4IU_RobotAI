@@ -2,10 +2,10 @@
 stt가 반환하는 result 값은
 (text, {"language", "emotion", "event", "itn"})
 '''
-from .audio_recorder_ko import AudioToTextRecorder
+from audio_recorder_ko import AudioToTextRecorder
 
 class STTModule:
-    def __init__(self, on_text_callback):
+    def __init__(self, on_text_callback=None):
         self.on_text_callback = on_text_callback
         self.recorder = AudioToTextRecorder(
             language="ko", 
@@ -23,7 +23,11 @@ class STTModule:
     def _run(self):
         result = self.recorder.text()
         if result:
-            self.on_text_callback(result)
+            if self.on_text_callback is not None:
+            		self.on_text_callback(result)
+            else:
+            	print(result)
+            
 
     def start(self):
         """ stt 실행 """
@@ -47,4 +51,10 @@ class STTModule:
             self.recorder.set_microphone(True)
             self.isMic = True
             self._run()
-            
+
+
+if __name__ == "__main__":
+    stt = STTModule()
+
+    while True:
+        stt.start()

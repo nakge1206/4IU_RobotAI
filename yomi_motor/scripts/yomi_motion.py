@@ -35,15 +35,17 @@ class MotionController:
         self.vision_location = []
     
     def _vision_information(self):
-        detects = self.vision.vision_get_detections()
+        # detects = self.vision.vision_get_detections()
+        detects = None
         self.vision_detect.clear()
         self.vision_location.clear()
-        for item in detects:
-            self.vision_detect.append(item['label'])
-            box = item['box']
-            center_x = (box[0] + box[2])/2
-            center_y = (box[1] + box[3]) / 2
-            self.vision_location.append((center_x, center_y))
+        if detects is not None:
+            for item in detects:
+                self.vision_detect.append(item['label'])
+                box = item['box']
+                center_x = (box[0] + box[2])/2
+                center_y = (box[1] + box[3]) / 2
+                self.vision_location.append((center_x, center_y))
 
     def frontal(self):
         # 로봇이 정면을 바라볼 때 우선 detect 되는 애가 있으면 발동을 하는 것이기에 이것은 정면을 봐야하는 다른 동작이 있을 시 그 동작 내에 if문을 추가해서 이 함수를 발동 시키게 하는게 맞는 거 같다.
@@ -134,10 +136,22 @@ class MotionController:
         rospy.sleep(0.2)
     
     def test(self):
-        self.executor.motor_publisher_batch(motor_ids=[6], motor_positions=[95], motor_speeds=[6])
+        self.executor.motor_publisher_batch(motor_ids=[6, 10], motor_positions=[95, 265], motor_speeds=[7, 7])
         rospy.sleep(0.2)
-        self.executor.motor_publisher_batch(motor_ids=[10], motor_positions=[265], motor_speeds=[7])
-        rospy.sleep(3)
+        self.executor.motor_publisher_batch(motor_ids=[5, 9], motor_positions=[220, 140], motor_speeds=[7, 7])
+        rospy.sleep(0.2)
+        self.executor.motor_publisher_batch(motor_ids=[6, 10], motor_positions=[180, 180], motor_speeds=[7, 7])
+        rospy.sleep(1)
+        self.executor.motor_publisher_batch(motor_ids=[6, 10], motor_positions=[95, 265], motor_speeds=[7, 7])
+        rospy.sleep(1)
+        self.executor.motor_publisher_batch(motor_ids=[6, 10], motor_positions=[180, 180], motor_speeds=[7, 7])
+        rospy.sleep(1)
+        self.executor.motor_publisher_batch(motor_ids=[6, 10], motor_positions=[95, 265], motor_speeds=[7, 7])
+        rospy.sleep(1)
+        self.executor.motor_publisher_batch(motor_ids=[6, 10], motor_positions=[180, 180], motor_speeds=[7, 7])
+        rospy.sleep(1)
+        self.executor.motor_publisher_batch(motor_ids=[6, 10], motor_positions=[95, 265], motor_speeds=[7, 7])
+        rospy.sleep(1)
 
     """
         11, 12: 머리 위 아래, 좌우

@@ -70,5 +70,9 @@ class motorCore:
             time.sleep(1)
 
 if __name__ == '__main__':
+    start_time = time.time()
     motor_core = motorCore()
     motor_core.run_motion_from_gpt()
+    end_time = time.time()
+    running_time = end_time - start_time
+    print(f"실행시간: {running_time:2f}")

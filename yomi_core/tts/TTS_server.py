@@ -143,11 +143,12 @@ class TTSServer:
 
 
 class TTSClient:
-    def __init__(self, host='127.0.0.1', port=65432, on_done=None, on_start=None):
+    def __init__(self, host='127.0.0.1', port=65432, on_done=None, on_start=None, on_middle=None):
         self.host = host
         self.port = port
         self.on_done = on_done
         self.on_start = on_start
+        self.on_middle = on_middle
         self.isRunning = True
 
     def send_text(self, text: str):
@@ -163,6 +164,8 @@ class TTSClient:
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                     s.connect((self.host, self.port))
                     s.sendall(text.encode('utf-8'))
+                    if self.on_middle:
+                        self.on_middle()
                     result = s.recv(1024).decode()
                     if result.strip() == "done":
                         print("[TTS] [Client] 재생 완료")
