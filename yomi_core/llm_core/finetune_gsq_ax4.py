@@ -39,7 +39,7 @@ peft_config = LoraConfig(
 model = get_peft_model(model, peft_config)
 
 # 3. 데이터셋 로딩
-dataset = load_dataset("json", data_files="new_dataset.jsonl", split="train")
+dataset = load_dataset("json", data_files="yomi_core/llm_core/new_dataset.json", split="train")
 
 def tokenize_function(example):
     # input dict를 문자열로 변환
@@ -66,7 +66,7 @@ output_dir = f"./ax4_lora_finetune_{datetime.datetime.now().strftime('%Y%m%d_%H%
 
 training_args = TrainingArguments(
     output_dir=output_dir,
-    per_device_train_batch_size=4,
+    per_device_train_batch_size=1,
     num_train_epochs=5,
     learning_rate=1e-4,
     weight_decay=0.01,
@@ -74,7 +74,7 @@ training_args = TrainingArguments(
     save_total_limit=1,
     save_strategy="epoch",
     report_to="none",
-    remove_unused_columns=False,
+    remove_unused_columns=True,
     no_cuda=False
     )
 

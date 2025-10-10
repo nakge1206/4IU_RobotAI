@@ -4,47 +4,110 @@ import time
 import os
 import re
 from pathlib import Path
+import json
+from sentence_transformers import SentenceTransformer
+import networkx as nx
+
+
+class MemoryGraph:
+    """ 사건/대화 내용을 그래프 구조로 저장하는 클래스 """
+
+    def __init__(self, path="memory_graph"):
+        self.path = path
+        os.makedirs(path, exist_ok=True)
+        self.graph_file = os.path.join(path, "memory_graph.json")
+        self.graph = nx.DiGraph()
+        self.encoder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+
+        if os.path.exists(self.graph_file):
+            self.load()
+
+    def add_event(self, text):
+        """ 대화 이벤트를 노드로 추가 """
+        emb = self.encoder.encode([text])[0].tolist()
+        node_id = f"event_{len(self.graph.nodes)}"
+        self.graph.add_node(node_id, text=text, embedding=emb, time=time.time())
+        if len(self.graph.nodes) > 1:
+            prev_id = f"event_{len(self.graph.nodes)-2}"
+            self.graph.add_edge(prev_id, node_id)
+        self.save()
+
+    def search_related(self, query, topk=3):
+        """ 쿼리와 유사한 이벤트 검색 """
+        if not self.graph.nodes:
+            return []
+        q_emb = self.encoder.encode([query])[0]
+        scored = []
+        for nid, data in self.graph.nodes(data=True):
+            emb = torch.tensor(data["embedding"])
+            sim = torch.nn.functional.cosine_similarity(
+                torch.tensor(q_emb), emb, dim=0
+            ).item()
+            scored.append((sim, data["text"]))
+        scored.sort(reverse=True)
+        return [t for _, t in scored[:topk]]
+
+    def save(self):
+        data = {
+            "nodes": [
+                (nid, self.graph.nodes[nid]) for nid in self.graph.nodes
+            ],
+            "edges": list(self.graph.edges)
+        }
+        with open(self.graph_file, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+
+    def load(self):
+        with open(self.graph_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        self.graph = nx.DiGraph()
+        self.graph.add_nodes_from(data["nodes"])
+        self.graph.add_edges_from(data["edges"])
 
 
 class LLMResponder:
     def __init__(self,
-                 model_path="C:/Users/COM/Desktop/yomi/4IU_RobotAI/yomi_core/llm_core/adapter_ax",
-                 adapter_path=None):
+                 model_path="skt/A.X-4.0-Light",   # ✅ 베이스 모델
+                 adapter_path=r"C:/Users/COM/Desktop/yomi/4IU_RobotAI/yomi_core/llm_core/ax4_lora_finetune_20251002_154704/checkpoint-2495"  # ✅ LoRA
+                 ):
         print("[LLMResponder] 초기화 중...")
 
-        model_path = Path(model_path).resolve()
-        if adapter_path:
-            adapter_path = Path(adapter_path).resolve()
-
+        # 베이스 토크나이저/모델은 HF 원본에서 로드
         self.tokenizer = AutoTokenizer.from_pretrained(
-            str(model_path),
+            model_path,
             trust_remote_code=True,
-            local_files_only=True
+            # local_files_only=True,  # 캐시에 100% 있을 때만 켜세요
         )
 
         self.model = AutoModelForCausalLM.from_pretrained(
-            str(model_path),
+            model_path,
             trust_remote_code=True,
             torch_dtype=torch.float16,
             low_cpu_mem_usage=True,
             device_map="auto",
-            local_files_only=True
+            # local_files_only=True,  # 캐시에 100% 있을 때만 켜세요
         )
 
-        if adapter_path:
-            from peft import PeftModel
-            self.model = PeftModel.from_pretrained(
-                self.model,
-                str(adapter_path),
-                local_files_only=True
-            )
+        # LoRA 어댑터 연결
+        from peft import PeftModel
+        self.model = PeftModel.from_pretrained(
+            self.model,
+            adapter_path,
+            local_files_only=True   # 어댑터는 로컬이 맞음
+        )
 
         self.model.eval()
         print("[LLMResponder] 모델 준비 완료")
 
+
+        # 그래프 기반 메모리 추가
+        self.memory_graph = MemoryGraph()
+
+        # 캐릭터 초기 정보
         self.character_info = (
             "이 캐릭터는 5살 여자아이 요미야. 이름은 요미이고, MBTI는 ESTJ야. "
-            "좋아하는 건 치킨, 강아지, 술래잡기, 그림 그리기야. 무서운 건 번개고, 칭찬받으면 기뻐해."
+            "좋아하는 건 치킨, 강아지, 술래잡기, 그림 그리기야. "
+            "무서운 건 번개고, 칭찬받으면 기뻐해."
         )
 
     def wrap_prompt(self, text, emotion=None, event=None, mbti=None, vision=None):
@@ -58,11 +121,16 @@ class LLMResponder:
         if vision:
             meta_info.append(f"시각 정보: {vision}")
 
+        # 그래프에서 관련 기억 꺼내오기
+        related = self.memory_graph.search_related(text, topk=3)
+        related_str = "\n".join([f"- {r}" for r in related]) if related else "없음"
+
         meta_str = " ".join(meta_info)
 
         return (
             f"### 캐릭터 요약\n{self.character_info}\n\n"
             f"### 사용자 정보\n{meta_str if meta_str else '정보 없음'}\n\n"
+            f"### 과거 관련 기억\n{related_str}\n\n"
             "### 시스템 지침\n"
             "너는 유아야. 입력 내용을 보고 상황에 맞는 유아 말투의 자연스러운 반응을 해줘.\n"
             "그리고 반드시 감정을 함께 추론해. 감정은 다음 8가지 중 하나만 선택해:\n"
@@ -99,32 +167,26 @@ class LLMResponder:
 
         print("[🧪 모델 출력 원문]", repr(output_text))
 
-        # 라인 기반 추출
-        response_line = None
-        emotion_line = None
+        # ───────────── 응답 후처리 (정규식 기반) ─────────────
+        response_text, emotion_text = None, None
 
-        for line in output_text.splitlines():
-            if '"대답"' in line:
-                response_line = line
-            elif '"감정"' in line:
-                emotion_line = line
+        match_resp = re.search(r'"대답"\s*:\s*["“”]?([^"\n]+)', output_text)
+        match_emot = re.search(r'"감정"\s*:\s*["“”]?([^"\n]+)', output_text)
 
-        if response_line and emotion_line:
-            response_text = re.sub(r'"?대답"?\s*:\s*["“”]?', '', response_line).strip().strip('"”')
-            emotion_text = re.sub(r'"?감정"?\s*:\s*["“”]?', '', emotion_line).strip().strip('"”')
+        if match_resp:
+            response_text = match_resp.group(1).strip()
+        if match_emot:
+            emotion_text = match_emot.group(1).strip()
 
-            if "<유아 말투 문장>" in response_text or not response_text:
-                return '"대답": 못들었어 다시 말해줘!\n"감정": 기쁨'
+        if not response_text:
+            response_text = "못들었어 다시 말해줘!"
+        if not emotion_text:
+            emotion_text = "기쁨"
 
-            return f'"대답": {response_text}\n"감정": {emotion_text}'
+        final = f'"대답": {response_text}\n"감정": {emotion_text}'
 
-        # 감정만 추출된 경우
-        emotion_match = re.search(r'(기쁨|신뢰|공포|놀람|슬픔|혐오|분노|기대)', output_text)
-        if emotion_match:
-            emotion = emotion_match.group(1)
-            response_text = output_text.replace(emotion, "").strip()
-            return f'"대답": {response_text}\n"감정": {emotion}'
+        # ───────────── 메모리에 저장 ─────────────
+        self.memory_graph.add_event(f"user: {text}")
+        self.memory_graph.add_event(f"yomi: {response_text} ({emotion_text})")
 
-        # fallback
-        print("[⚠️ 경고] 형식 추출 실패. fallback 사용")
-        return f'"대답": 못들었어 다시 말해줘!\n"감정": 기쁨'
+        return final

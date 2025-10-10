@@ -26,6 +26,9 @@ gsq_lora_adapter_blossom_backup
 gsq_lora_adapter_koalpaca/
 gsq_lora_beomi7b_out/
 adapter_ax/
+ax4_lora_finetune_20251002_154704/
+memory_manager_graph.py
+memory_manager.py
 
 #vision
 detections_log.json
