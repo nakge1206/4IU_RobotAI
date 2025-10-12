@@ -316,15 +316,15 @@ class Yomi:
         
         print(f"[YOMI] (make_prompt) 생성된 프롬프트 (target={target}, stt_llm={stt_llm}, switch_llm={switch_llm}): \n{result}")
 
-        resultMbti = json.dumps([result, self.mbti])
-
-        return resultMbti
+        # resultMbti = json.dumps([result, self.mbti])
+        # return resultMbti
+        return result
     
     def handle_main_llm(self, text):
         """메인 LLM 처리"""
 
         #대답 및 감정 추출
-        responseAndEmotion = self.llm.send(text)
+        responseAndEmotion = self.llm.send(text, self.mbti)
 
         # 감정 맵핑
         emotion_map = {
