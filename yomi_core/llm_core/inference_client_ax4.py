@@ -4,7 +4,7 @@ import threading
 import json
 
 class LLMClient:
-    def __init__(self, uri="ws://172.27.224.53:8765"):
+    def __init__(self, uri="ws://172.27.235.179:8765"):
         self.uri = uri
         self.websocket = None
         
