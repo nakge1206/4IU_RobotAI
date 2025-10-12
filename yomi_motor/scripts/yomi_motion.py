@@ -137,22 +137,7 @@ class MotionController:
     
     def test(self):
         self.executor.motor_publisher_batch(motor_ids=[6, 10], motor_positions=[95, 265], motor_speeds=[7, 7])
-        rospy.sleep(0.2)
-        self.executor.motor_publisher_batch(motor_ids=[5, 9], motor_positions=[220, 140], motor_speeds=[7, 7])
-        rospy.sleep(0.2)
-        self.executor.motor_publisher_batch(motor_ids=[6, 10], motor_positions=[180, 180], motor_speeds=[7, 7])
-        rospy.sleep(1)
-        self.executor.motor_publisher_batch(motor_ids=[6, 10], motor_positions=[95, 265], motor_speeds=[7, 7])
-        rospy.sleep(1)
-        self.executor.motor_publisher_batch(motor_ids=[6, 10], motor_positions=[180, 180], motor_speeds=[7, 7])
-        rospy.sleep(1)
-        self.executor.motor_publisher_batch(motor_ids=[6, 10], motor_positions=[95, 265], motor_speeds=[7, 7])
-        rospy.sleep(1)
-        self.executor.motor_publisher_batch(motor_ids=[6, 10], motor_positions=[180, 180], motor_speeds=[7, 7])
-        rospy.sleep(1)
-        self.executor.motor_publisher_batch(motor_ids=[6, 10], motor_positions=[95, 265], motor_speeds=[7, 7])
-        rospy.sleep(1)
-
+        rospy.sleep(0.5)
     """
         11, 12: 머리 위 아래, 좌우
         3, 7: 어깨 앞뒤로
@@ -164,7 +149,7 @@ class MotionController:
     # 4, 8: 110~ 260 110이 내리기 260이 들기, 100~250 250이 내리기 100이 들기
     # 5, 9: 90~ 270, 안쪽으로 굽는게 낮은 숫자 180 중앙, 90~270 안쪽으로 굽는게 높은 숫자 180 중앙 
     # 6, 10: 95~180 95가 굽은거 180이 핀거, 180 ~ 265 265가 굽은거 180이 핀거 
-    # 11: 159가 아래인 걸 보니 숫자를 내리면 머리를 아래로 향함 180 중앙
+    # 11: 120~ 240 159가 아래인 걸 보니 숫자를 내리면 머리를 아래로 향함 180 중앙
     # 12: 130~230 180 중앙
 
     def homshowping1(self):
