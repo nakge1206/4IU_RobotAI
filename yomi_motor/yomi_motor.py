@@ -1,9 +1,14 @@
 # yomi_motor.py
 import json
 import threading
+import os, time
+from dotenv import load_dotenv
+from openai import OpenAI
+import openai
+import tempfile
 from pathlib import Path
 from typing import Dict, List, Optional, Callable, Any
-from yomi_motor_run import MotionSequenceExecutor
+# from yomi_motor_run import MotionSequenceExecutor
 
 class EmotionJsonPicker:
     """
@@ -27,6 +32,9 @@ class EmotionJsonPicker:
         strict: bool = False,
         encoding: str = "utf-8",
         on_round_complete: Optional[Callable[[str], None]] = None,
+        # LLM 설정 (같은 클래스 내부)
+        llm_temperature: float = 0.2,
+        enable_llm: bool = True,
     ):
         """
         base_dir : 감정 폴더들이 모여있는 루트 디렉토리
@@ -56,9 +64,26 @@ class EmotionJsonPicker:
         self.encoding = encoding
 
         self.rng = random.Random(seed)
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
+        
+        self._refill_locks: Dict[str, threading.Lock] = {
+            emo: threading.Lock() for emo in self.emotions
+        }
 
-        self.motor = MotionSequenceExecutor()
+        # LLM 설정/클라이언트
+        self.enable_llm = enable_llm
+        self.openai_model = "ft:gpt-4o-2024-08-06:personal::CR1Ggcr5"
+        self.llm_temperature = llm_temperature
+        self._openai_client = None
+        load_dotenv()
+        openai_api_key = os.getenv("OPENAI_API_KEY") 
+        print(openai_api_key)
+        if self.enable_llm:
+            self._init_openai_client(openai_api_key)
+        
+
+        # self.motor = MotionSequenceExecutor()
+        self.motor = None
 
         # init 시 바로 스캔 및 상태 초기화
         self._scan_and_build_pools()
@@ -71,38 +96,78 @@ class EmotionJsonPicker:
         감정의 모든 항목을 1회씩 쓰면 on_key_reset 콜백 호출 후 해당 감정만 reset.
         """
         self._check_key(key)
-        with self._lock:
-            used_row = self.used[key]
-            pool_row = self.pools[key]
+        max_attempts = 3
+        attempts = 0
+        entry: Optional[Dict[str, Any]] = None
 
-            if not pool_row:
-                raise RuntimeError(f"[EmotionJsonPicker] '{key}' 폴더에 JSON이 없습니다: {self.base_dir / key}")
-            
-            # 아직 안 쓴 후보들
-            candidates = [i for i, flag in enumerate(used_row) if not flag]
-
-            # (방어) 후보가 없다면 해당 key만 새 라운드 시작
-            if not candidates:
-                self._reset_key_internal(key)
+        while attempts < max_attempts:
+            with self._lock:
                 used_row = self.used[key]
                 pool_row = self.pools[key]
-                candidates = list(range(len(pool_row)))
 
-            j = self.rng.choice(candidates)
-            used_row[j] = True
-            entry = pool_row[j]
-            round_done = all(used_row)
-            print(f"[YOMI_MOTOR] (pick) 감정:{key}, idx:{j}")
+                if not pool_row:
+                    raise RuntimeError(f"[EmotionJsonPicker] '{key}' 폴더에 JSON이 없습니다: {self.base_dir / key}")
+                
+                # 아직 안 쓴 후보들
+                candidates = [i for i, flag in enumerate(used_row) if not flag]
+                if candidates:
+                    j = self.rng.choice(candidates)
+                    used_row[j] = True
+                    entry = pool_row[j]
+                    print(f"[YOMI_MOTOR] (pick) emotion:{key}, idx:{j}, name:{entry['name']}")
+                    break
+                
+                refill_lock = self._refill_locks[key]
+                acquired = refill_lock.acquire(blocking=False)
+                try:
+                    if acquired:
+                        # 알림 콜백
+                        if self.on_round_complete:
+                            try:
+                                self.on_round_complete(key)
+                            except Exception as e:
+                                print(f"[EmotionJsonPicker] on_round_complete 에러: {e}")
 
-        if round_done:
-            self._reset_key_internal(key)
+                        # LLM 생성
+                        if not self.enable_llm:
+                            raise RuntimeError("[EmotionJsonPicker] 라운드 소진되었지만 LLM이 비활성화되어 있습니다.")
+                        if not self.openai_model:
+                            raise RuntimeError("[EmotionJsonPicker] openai_model이 설정되지 않았습니다.")
+                        if not self._openai_client:
+                            raise RuntimeError("[EmotionJsonPicker] OpenAI 클라이언트 초기화 실패(키/SDK 확인).")
+
+                        try:
+                            new_obj = self._llm_generate_json(key)
+                        except Exception as e:
+                            print(f"[EmotionJsonPicker] LLM 생성 에러: {e}")
+                            # 생성 실패면 더 진행해봤자 후보가 늘지 않으므로 재시도/백오프는 상위에서 정책적으로 처리
+                            raise
+
+                        try:
+                            final_path = self._next_sequential_filepath(key)
+                            self._atomic_dump_json(new_obj, final_path)
+                            print(f"[EmotionJsonPicker] 새 후보 저장: {final_path}")
+                        except Exception as e:
+                            print(f"[EmotionJsonPicker] 새 후보 저장 실패: {e}")
+                            # 저장 실패 시 재스캔만으로 후보가 늘지 않으므로 그대로 루프 재시도(결국 예외 가능)
+
+                        # 동기 재스캔(I/O만)
+                        self._rescan_key_only(key)
+                    else:
+                        # 다른 스레드가 리필 중이면 잠깐 대기 후 다시 확인
+                        time.sleep(0.01)
+                finally:
+                    if acquired:
+                        refill_lock.release()
+
+            attempts += 1
 
 
-        threading.Thread(
-            target=self.motor.execute_sequence_data,
-            args=(entry["data"],),
-            daemon=True
-        ).start()
+        # threading.Thread(
+        #     target=self.motor.execute_sequence_data,
+        #     args=(entry["data"],),
+        #     daemon=True
+        # ).start()
 
         return entry
 
@@ -123,92 +188,269 @@ class EmotionJsonPicker:
         """디스크를 다시 스캔하여 pools를 갱신하고 사용 상태를 초기화."""
         with self._lock:
             self._scan_and_build_pools()
+    
+    # --------- internal: LLM ----------
+    def _init_openai_client(self, api_key: Optional[str]):
+        if not OpenAI:
+            print("[EmotionJsonPicker] 경고: OpenAI SDK 임포트 실패. LLM 비활성화됨.")
+            self._openai_client = None
+            self.enable_llm = False
+            return
+        # 환경변수 우선
+        if api_key:
+            os.environ.setdefault("OPENAI_API_KEY", api_key)
+        try:
+            self._openai_client = OpenAI()
+        except Exception as e:
+            print(f"[EmotionJsonPicker] OpenAI 클라이언트 초기화 실패: {e}")
+            self._openai_client = None
+            self.enable_llm = False
+
+    def _generate_json_for_key(self, key: str) -> Any:
+        """
+        LLM이 켜져 있으면 LLM으로 생성, 아니면 더미 JSON 생성.
+        """
+        if not self.enable_llm:
+            return self._dummy_generate_json(key)
+
+        if not self.openai_model or not self._openai_client:
+            raise RuntimeError("[EmotionJsonPicker] LLM이 활성화됐지만 모델/클라이언트 준비가 안 됨")
+
+        return self._llm_generate_json(key)
+
+    def _llm_generate_json(self, key: str) -> Any:
+        """
+        LLM을 호출해 JSON-serializable 객체를 반환.
+        모델은 self.openai_model 사용, 프롬프트는 감정 key 하나로 단순화.
+        """
+        client = self._openai_client
+        resp = client.chat.completions.create(
+            model=self.openai_model,
+            messages=[
+                {"role": "user", "content": key},
+            ],
+            temperature=self.llm_temperature,
+        )
+        text = resp.choices[0].message.content
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            # 모델이 JSON만 반환하지 못하는 경우 대비
+            print(f"[EmotionJsonPicker] LLM이 유효하지 않은 JSON을 반환했습니다: {text}")
+            raise RuntimeError(f"LLM이 '{key}'에 대해 유효한 JSON을 반환하지 못했습니다.") from e
+
+    def _dummy_generate_json(self, key: str) -> Any:
+        """LLM 비활성 시 사용할 더미 생성기(테스트용)."""
+        return {
+            "emotion": key,
+            "generated_at": int(time.time()),
+            "sequence": [
+                {"act": "start", "duration": 0.2},
+                {"act": f"{key}_pose", "duration": 1.0},
+                {"act": "end", "duration": 0.2},
+            ],
+        }
+
 
     # --------- internal ---------
     def _scan_and_build_pools(self):
         """디스크에서 JSON을 스캔해 pools/used를 만든다."""
         pools: Dict[str, List[Dict[str, Any]]] = {}
         for emo in self.emotions:
-            d = self.base_dir / emo
-            if not d.exists() or not d.is_dir():
-                msg = f"[EmotionJsonPicker] 경고: '{emo}' 폴더가 없습니다: {d}"
-                if self.strict:
-                    raise FileNotFoundError(msg)
-                print(msg)
-                pools[emo] = []
-                continue
-
-            it = d.rglob(self.pattern) if self.recursive else d.glob(self.pattern)
-            files = sorted(it)  # 재현성 위해 정렬
-            entries: List[Dict[str, Any]] = []
-            for f in files:
-                try:
-                    with open(f, "r", encoding=self.encoding) as fh:
-                        data = json.load(fh)
-                    entries.append({
-                        "path": str(f.resolve()),
-                        "name": f.stem,
-                        "data": data,
-                    })
-                except Exception as e:
-                    msg = f"[EmotionJsonPicker] JSON 로드 실패: {f} ({e})"
-                    if self.strict:
-                        raise RuntimeError(msg)
-                    print(msg)
+            entries = self._scan_one_emotion(emo)
             pools[emo] = entries
-
         self.pools = pools
         self.used = {k: [False] * len(v) for k, v in pools.items()}
-
-    def _reset_key_internal(self, key: str):
-        """해당 감정만 새 라운드 시작(used를 False로 초기화)"""
-        with self._lock:
-            self._check_key(key)
-            self.used[key] = [False] * len(self.pools[key])
         
-        def _worker():
-            try:
-                if self.on_round_complete:
-                    self.on_round_complete(key)   # 외부 함수 호출
-            except Exception as e:
-                print(f"[EmotionJsonPicker] on_round_complete 에러: {e}")
-            # 해당 감정만 다시 스캔
-            self._rescan_key(key)
-        threading.Thread(target=_worker, daemon=True).start()
-    
-    def _rescan_key(self, key: str):
-        """해당 감정 폴더만 다시 스캔하여 pools[key], used[key] 갱신.
-        다른 감정의 used/pools는 유지."""
-        self._check_key(key)
-        d = self.base_dir / key
+    def _scan_one_emotion(self, emo: str) -> List[Dict[str, Any]]:
+        d = self.base_dir / emo
         if not d.exists() or not d.is_dir():
+            msg = f"[EmotionJsonPicker] 경고: '{emo}' 폴더가 없습니다: {d}"
             if self.strict:
-                raise FileNotFoundError(f"[EmotionJsonPicker] '{key}' 폴더가 없습니다: {d}")
-            print(f"[EmotionJsonPicker] 경고: '{key}' 폴더가 없습니다: {d}")
-            new_entries: List[Dict[str, Any]] = []
-        else:
-            it = d.rglob(self.pattern) if self.recursive else d.glob(self.pattern)
-            files = sorted(it)
-            new_entries: List[Dict[str, Any]] = []
-            for f in files:
-                try:
-                    with open(f, "r", encoding=self.encoding) as fh:
-                        data = json.load(fh)
-                    new_entries.append({"path": str(f.resolve()), "name": f.stem, "data": data})
-                except Exception as e:
-                    msg = f"[EmotionJsonPicker] JSON 로드 실패: {f} ({e})"
-                    if self.strict:
-                        raise RuntimeError(msg)
-                    print(msg)
+                raise FileNotFoundError(msg)
+            print(msg)
+            return []
+        
+        it = d.rglob(self.pattern) if self.recursive else d.glob(self.pattern)
+        files = sorted(it)
+        entries: List[Dict[str, Any]] = []
+        for f in files:
+            try:
+                with open(f, "r", encoding=self.encoding) as fh:
+                    data = json.load(fh)
+                entries.append({
+                    "path": str(f.resolve()),
+                    "name": f.stem,
+                    "data": data,
+                })
+            except Exception as e:
+                msg = f"[EmotionJsonPicker] JSON 로드 실패: {f} ({e})"
+                if self.strict:
+                    raise RuntimeError(msg)
+                print(msg)
+        return entries
 
-        # 실제 교체는 짧게 락 잡고 수행
+    def _rescan_key_only(self, key: str):
+        """해당 감정 폴더만 다시 스캔하여 pools[key], used[key] 갱신 (생성 없음)."""
+        self._check_key(key)
+        new_entries = self._scan_one_emotion(key)
         with self._lock:
             self.pools[key] = new_entries
-            self.used[key]  = [False] * len(new_entries)  # 해당 감정만 초기화
+            self.used[key] = [False] * len(new_entries)
+
+    def _next_sequential_filepath(self, key: str) -> Path:
+        """
+        key(\d+).json 중 최대 번호 + 1 로 파일 경로를 생성.
+        예: joy0..joy5.json 있으면 joy6.json 반환.
+        """
+        d = self.base_dir / key
+        d.mkdir(parents=True, exist_ok=True)
+
+        it = d.rglob(self.pattern) if self.recursive else d.glob(self.pattern)
+        maxn = -1
+        prefix = key
+        for f in it:
+            stem = f.stem
+            if stem.startswith(prefix):
+                tail = stem[len(prefix):]
+                if tail.isdigit():
+                    try:
+                        n = int(tail)
+                        if n > maxn:
+                            maxn = n
+                    except ValueError:
+                        pass
+        nextn = maxn + 1
+        return d / f"{prefix}{nextn}.json"
+    
+    def _atomic_dump_json(self, obj: Any, final_path: Path):
+        """JSON을 임시파일에 쓴 뒤 os.replace로 원자적 저장."""
+        final_path.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(
+            "w", delete=False, encoding=self.encoding, dir=str(final_path.parent)
+        ) as tmp:
+            json.dump(obj, tmp, ensure_ascii=False, indent=2)
+            tmp_path = tmp.name
+        os.replace(tmp_path, final_path)
 
     def _check_key(self, key: str):
-        if key not in self.pools:
-            raise KeyError(f"알 수 없는 감정 키: {key!r}. 사용 가능: {list(self.pools.keys())}")
+        if not hasattr(self, "pools") or key not in self.pools:
+            raise KeyError(f"알 수 없는 감정 키: {key!r}. 사용 가능: {list(getattr(self, 'pools', {}).keys())}")
+
+    # def _reset_key_internal(self, key: str):
+    #     """해당 감정만 새 라운드 시작(used를 False로 초기화)"""
+    #     with self._lock:
+    #         self._check_key(key)
+    #         self.used[key] = [False] * len(self.pools[key])
+        
+    #     def _worker():
+    #         try:
+    #             if self.on_round_complete:
+    #                 self.on_round_complete(key)   # 외부 함수 호출
+    #         except Exception as e:
+    #             print(f"[EmotionJsonPicker] on_round_complete 에러: {e}")
+    #         # 해당 감정만 다시 스캔
+    #         self._rescan_key(key)
+    #     threading.Thread(target=_worker, daemon=True).start()
+    
+    # def _rescan_key(self, key: str):
+    #     """해당 감정 폴더만 다시 스캔하여 pools[key], used[key] 갱신.
+    #     다른 감정의 used/pools는 유지."""
+    #     self._check_key(key)
+
+    #    # [1. 파일명 결정을 위해 현재 파일 개수 스캔]
+    #     # (API 호출 전에 파일명을 미리 정해야 함)
+        
+    #     # 타겟 디렉토리 경로 설정
+    #     d = self.base_dir / key
+        
+    #     # 폴더가 없으면 생성 (파일 개수 세기 전에 필요)
+    #     d.mkdir(parents=True, exist_ok=True) 
+
+    #     try:
+    #         # 현재 폴더의 .json 파일 개수를 셉니다.
+    #         it = d.rglob(self.pattern) if self.recursive else d.glob(self.pattern)
+    #         current_count = len(list(it))
+    #         new_file_number = current_count + 1
+            
+    #         # [핵심 수정] 새 파일명 결정
+    #         filename = f"{key}{new_file_number}.json"
+    #         filepath = d / filename
+            
+    #     except Exception as e:
+    #         # 만약 파일 개수 세기에 실패하면 (예: 권한 문제) 타임스탬프로 대체
+    #         print(f"[EmotionJsonPicker] 파일 개수 세기 실패: {e}. 타임스탬프 이름으로 대체합니다.")
+    #         timestamp = int(time.time())
+    #         filename = f"openai_gen_{key}_{timestamp}.json"
+    #         filepath = d / filename
+
+
+    #     # [2. API 호출 및 파일 저장 로직]
+    #     try:
+    #         if not self.openai_client:
+    #             raise Exception("OpenAI 클라이언트가 초기화되지 않았습니다. (API 키 확인 필요)")
+
+    #         print(f"[EmotionJsonPicker] '{key}' 감정의 새 모션을 OpenAI로 생성합니다...")
+    #         response = self.openai_client.chat.completions.create(
+    #             model="ft:gpt-4o-2024-08-06:personal::CR1Ggcr5", # 사용자 파인튜닝 모델
+    #             messages=[
+    #                 {"role": "user", "content": key}
+    #             ]
+    #         )
+    #         output_text = response.choices[0].message.content
+
+    #         # 응답 파싱
+    #         try:
+    #             output_json = json.loads(output_text)
+    #         except json.JSONDecodeError:
+    #             print(f"[EmotionJsonPicker] '{key}' 응답이 JSON 형식이 아닙니다. 원본을 저장합니다.")
+    #             output_json = {"raw_output": output_text, "error": "Not valid JSON"}
+
+    #         # [핵심 수정] 위에서 계산된 'filepath' (예: .../joy/joy3.json)로 저장합니다.
+    #         with open(filepath, "w", encoding="utf-8") as f:
+    #             json.dump(output_json, f, indent=2, ensure_ascii=False)
+            
+    #         print(f"[EmotionJsonPicker] 새 모션 저장 완료: {filepath}")
+
+    #     except Exception as e:
+    #         # API 호출이나 파일 저장이 실패해도 리스캔은 시도해야 함
+    #         print(f"[EmotionJsonPicker] OpenAI API 호출 또는 파일 저장 실패: {e}")
+
+        
+    #     # [3. 폴더 리스캔 로직] (기존과 동일)
+    #     # (API 호출 성공 여부와 관계없이 폴더 전체를 다시 읽어들임)
+        
+    #     if not d.exists() or not d.is_dir():
+    #         if self.strict:
+    #             raise FileNotFoundError(f"[EmotionJsonPicker] '{key}' 폴더가 없습니다: {d}")
+    #         print(f"[EmotionJsonPicker] 경고: '{key}' 폴더가 없습니다: {d}")
+    #         new_entries: List[Dict[str, Any]] = []
+    #     else:
+    #         # 이제 이 glob은 방금 생성된 'keyN.json' 파일도 포함합니다.
+    #         it = d.rglob(self.pattern) if self.recursive else d.glob(self.pattern)
+    #         files = sorted(it)
+    #         new_entries: List[Dict[str, Any]] = []
+    #         for f in files:
+    #             try:
+    #                 with open(f, "r", encoding=self.encoding) as fh:
+    #                     data = json.load(fh)
+    #                 new_entries.append({"path": str(f.resolve()), "name": f.stem, "data": data})
+    #             except Exception as e:
+    #                 msg = f"[EmotionJsonPicker] JSON 로드 실패: {f} ({e})"
+    #                 if self.strict:
+    #                     raise RuntimeError(msg)
+    #                 print(msg)
+
+    #     # [4. 데이터 교체] (기존과 동일)
+    #     # 실제 교체는 짧게 락(lock)을 잡고 수행
+    #     with self._lock:
+    #         # self._check_key(key) # _rescan_key 맨 위에서 이미 검사함
+    #         self.pools[key] = new_entries
+    #         self.used[key]  = [False] * len(new_entries)  # 해당 감정만 초기화
+
+    # def _check_key(self, key: str):
+    #     if key not in self.pools:
+    #         raise KeyError(f"알 수 없는 감정 키: {key!r}. 사용 가능: {list(self.pools.keys())}")
 
 # --------- 테스트 코드 ---------
 if __name__ == "__main__":
