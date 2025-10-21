@@ -8,7 +8,7 @@ import openai
 import tempfile
 from pathlib import Path
 from typing import Dict, List, Optional, Callable, Any
-# from yomi_motor_run import MotionSequenceExecutor
+from yomi_motor_run import MotionSequenceExecutor
 
 class EmotionJsonPicker:
     """
@@ -82,8 +82,8 @@ class EmotionJsonPicker:
             self._init_openai_client(openai_api_key)
         
 
-        # self.motor = MotionSequenceExecutor()
-        self.motor = None
+        self.motor = MotionSequenceExecutor()
+        # self.motor = None
 
         # init 시 바로 스캔 및 상태 초기화
         self._scan_and_build_pools()
@@ -163,11 +163,11 @@ class EmotionJsonPicker:
             attempts += 1
 
 
-        # threading.Thread(
-        #     target=self.motor.execute_sequence_data,
-        #     args=(entry["data"],),
-        #     daemon=True
-        # ).start()
+        threading.Thread(
+            target=self.motor.execute_sequence_data,
+            args=(entry["data"],),
+            daemon=True
+        ).start()
 
         return entry
 
@@ -200,7 +200,8 @@ class EmotionJsonPicker:
         if api_key:
             os.environ.setdefault("OPENAI_API_KEY", api_key)
         try:
-            self._openai_client = OpenAI()
+            self._openai_client = openai.OpenAI(api_key=api_key)
+            # self._openai_client = OpenAI()
         except Exception as e:
             print(f"[EmotionJsonPicker] OpenAI 클라이언트 초기화 실패: {e}")
             self._openai_client = None
@@ -227,9 +228,11 @@ class EmotionJsonPicker:
         resp = client.chat.completions.create(
             model=self.openai_model,
             messages=[
+                # {"role":"system", "content":"다음 감정에 대해 JSON 객체를 생성하십시오."},
                 {"role": "user", "content": key},
             ],
-            temperature=self.llm_temperature,
+            # response_format={"type": "json_object"},
+            # temperature=self.llm_temperature,
         )
         text = resp.choices[0].message.content
         try:
@@ -470,7 +473,7 @@ if __name__ == "__main__":
     print("▶ initial counts:", picker.counts())
 
     emotions = picker.emotions  # ["joy", "sadness", ... , "no"]
-    for t in range(20):
+    for t in range(30):
         key = random.choice(emotions)
         try:
             entry = picker.pick(key)  # {'path','name','data'}
@@ -479,6 +482,6 @@ if __name__ == "__main__":
         except RuntimeError as e:
             # 폴더 비었을 때 등
             print(f"[{t+1:02d}] key={key:<13} → SKIP ({e})")
-        time.sleep(0.05)
+        time.sleep(0.3)
 
-    print("▶ remaining after 20 picks:", picker.remaining())
+    print("▶ remaining after 30 picks:", picker.remaining())
