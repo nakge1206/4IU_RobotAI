@@ -19,7 +19,7 @@ class EmotionJsonPicker:
     """
     EMOTIONS_DEFAULT = [
         "joy", "sadness", "angry", "fear",
-        "surprise", "disgust", "trust", "anticipation"
+        "surprise", "disgust", "trust", "anticipation", "no"
     ]
 
     def __init__(
