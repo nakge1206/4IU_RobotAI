@@ -40,7 +40,6 @@ class LLMClient:
     def send(self, text, mbti="INFP"):
         if self.websocket is None:
             self.connect()
-        # ✅ 딕셔너리 형태로 전송
         payload = {"text": text, "mbti": mbti}
         future = asyncio.run_coroutine_threadsafe(self._send(payload), self.loop)
         return future.result()
@@ -57,10 +56,7 @@ class LLMClient:
                 msg = input("질문 (종료: ㅂㅂ): ").strip()
                 if msg.lower() in ['ㅂㅂ', 'exit', 'quit']:
                     break
-                # 필요하면 매번 또는 최초 1회 MBTI 코드 입력
-                mbti_in = input("MBTI 코드 입력 (I/E, 건너뛰기 Enter): ").strip().upper()
-                payload = {"question": msg, "mbti_code": mbti_in}
-                res = self.send(json.dumps(payload, ensure_ascii=False))
+                res = self.send(msg)   # ✅ MBTI 자동 기본값(INFP)
                 print("로봇 응답:", res)
         except Exception as e:
             print("[클라이언트 오류]", e)
