@@ -1,8 +1,8 @@
 import time
-import yomi_motor_core
-import yomi_motion
-from yomi_motor_core import motorCore
-from yomi_motion import MotionController
+import DEL_yomi_motor_core
+import yomi_motor.scripts.DEL_yomi_motion as DEL_yomi_motion
+from DEL_yomi_motor_core import motorCore
+from yomi_motor.scripts.DEL_yomi_motion import MotionController
 
 class motor_delay:
     def __init__(self):

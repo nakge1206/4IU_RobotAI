@@ -187,8 +187,14 @@ class YoloWorker(threading.Thread):
         self.prev_time = time.time()
 
     def run(self):
-        cap = cv2.VideoCapture(0)
-        if not cap.isOpened():
+        cap = None
+        for i in range(6):
+            cap = cv2.VideoCapture(i)
+            if cap.isOpened():
+                break
+        if cap.isOpened():
+            print(f"[VisionFace] [YoloWorker] 카메라 {i} 열기 성공")
+        else:
             print("[VisionFace] [YoloWorker] 카메라 열기 실패")
             return
         

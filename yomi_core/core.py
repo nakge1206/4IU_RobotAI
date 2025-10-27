@@ -19,13 +19,9 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'stt'))
 sys.path.append(os.path.join(os.path.dirname(__file__), 'llm_core'))
 sys.path.append(os.path.join(os.path.dirname(__file__), 'tts'))
 sys.path.append(os.path.join(os.path.dirname(__file__), 'vision_face'))
-current_dir = os.path.dirname(os.path.abspath(__file__))
-base_dir = os.path.abspath(os.path.join(current_dir, ".."))
-yomi_driving_path = os.path.join(base_dir, "yomi_motor/scripts")
-yomi_motor_path = os.path.join(base_dir, "yomi_motor")
-sys.path.append(yomi_driving_path)
-sys.path.append(yomi_motor_path)
-# sys.path.append(os.path.abspath('./yomi_motor'))
+path_4IU_RobotAI=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(path_4IU_RobotAI)
+sys.path.append(os.path.join(path_4IU_RobotAI, 'yomi_motor'))
 
 
 # 각 모듈 임포트
@@ -33,11 +29,11 @@ from stt.realtime_stt_module import STTModule           #STT
 from tts.TTS_server import TTSServer, VITS, TTSClient   #TTS
 from vision_face.VisionFace import VisonFaceMain        #Vision
 from llm_core.inference_client_ax4 import LLMClient     #LLM
-from yomi_motor_core import motorCore                   #Motor_LLM
-from yomi_motion import MotionController                #MotionController
-from yomi_motor.yomi_motor import EmotionJsonPicker               #MotionPicker
-# from yomi_motor.scripts.yomi_motor_core import motorCore#Motor
-# from yomi_motor.scripts.yomi_motion import MotionController
+from yomi_motor.yomi_motor_main import EmotionJsonPicker               #MotionPicker
+# from yomi_motor_core import motorCore                   #Motor_LLM
+# from yomi_motion import MotionController                #MotionController
+# from yomi_motor.scripts.DEL_yomi_motor_core import motorCore#Motor
+# from yomi_motor.scripts.DEL_yomi_motion import MotionController
 
 
 class Yomi:
@@ -101,8 +97,8 @@ class Yomi:
         print("▶ initial counts:", self.motionPicker.counts())
         self.VisionFace = VisonFaceMain(interval=2, on_vision_callback=self.handle_vision, viewGUI=True, mbti=self.mbti) if isVisionFace else None
         print(f"[YOMI] VisionFace : 준비완료 ({isVisionFace})")
-        self.motor_core = motorCore()
-        self.motor_controller = MotionController(self.VisionFace)
+        # self.motor_core = motorCore()
+        # self.motor_controller = MotionController(self.VisionFace)
         
         #ROS
         try:
@@ -197,9 +193,11 @@ class Yomi:
         self.sttTimer.start()
     
     def _vision_open(self):
+        #tiemout 설정되면 이거 실행됨
         #todo : 여기서 고개 돌아다니면서 확인하는 모션 함수 추가하면 될듯
         self.visionEnable = True
-        self.motor_controller.wait_command()
+        # self.handle_vision()
+        # self.motor_controller.wait_command()
 
     def handle_vision(self, visionText=None):
         """STT N초 이상 안들어오면 vision 정보 활용"""
@@ -363,24 +361,24 @@ class Yomi:
         #감정에 맞는 행동 실행
         entry = self.motionPicker.pick(self.llm_emotion_EN)
 
-    def handle_motor_llm(self, text):
-        """모터 관련 LLM 처리"""
-        print(f"[YOMI] (handle_motor_llm) MOTOR_LLM 실행됨")
-        func_name = self.motor_core.ask_finetuned_model(text)
-        print(f"[YOMI] (handle_motor_llm) MOTOR_LLM 결과 : {func_name}")
+    # def handle_motor_llm(self, text):
+    #     """모터 관련 LLM 처리"""
+    #     print(f"[YOMI] (handle_motor_llm) MOTOR_LLM 실행됨")
+    #     func_name = self.motor_core.ask_finetuned_model(text)
+    #     print(f"[YOMI] (handle_motor_llm) MOTOR_LLM 결과 : {func_name}")
 
-        if hasattr(self.motor_controller, func_name):
-            func = getattr(self.motor_controller, func_name)
-            print(f"[YOMI] [hadle_motor_llm] '{func_name}' 함수실행.")
-            if callable(func):
-                func()
-            else:
-                print(f"[YOMI] [hadle_motor_llm] Warning :'{func_name}'은 함수가 아닙니다.")
-        else:
-            print(f"[[YOMI] [hadle_motor_llm] Warning : MotionController에 '{func_name}' 함수 없음.")
-        self.motor_controller.finger_end()
-        self.stt_llm = False
-        self.switch_llm = False
+    #     if hasattr(self.motor_controller, func_name):
+    #         func = getattr(self.motor_controller, func_name)
+    #         print(f"[YOMI] [hadle_motor_llm] '{func_name}' 함수실행.")
+    #         if callable(func):
+    #             func()
+    #         else:
+    #             print(f"[YOMI] [hadle_motor_llm] Warning :'{func_name}'은 함수가 아닙니다.")
+    #     else:
+    #         print(f"[[YOMI] [hadle_motor_llm] Warning : MotionController에 '{func_name}' 함수 없음.")
+    #     self.motor_controller.finger_end()
+    #     self.stt_llm = False
+    #     self.switch_llm = False
 
 
     def on_tts_start(self):

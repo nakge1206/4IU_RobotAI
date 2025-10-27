@@ -77,7 +77,7 @@ class EmotionJsonPicker:
         self._openai_client = None
         load_dotenv()
         openai_api_key = os.getenv("OPENAI_API_KEY") 
-        print(openai_api_key)
+        # print(openai_api_key)
         if self.enable_llm:
             self._init_openai_client(openai_api_key)
         

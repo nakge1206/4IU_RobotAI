@@ -22,7 +22,7 @@ from sensor_msgs.msg import Joy #joystick 값
 #ros통신용 
 import rospy, rosgraph 
 from std_msgs.msg import String, Bool 
-from yomi_motor.scripts.yomi_motion import MotionController 
+from yomi_motor.scripts.DEL_yomi_motion import MotionController 
 from yomi_core.tts.TTS_server import TTSServer, VITS, TTSClient 
 from yomi_core.vision_face.VisionFace import VisonFaceMain 
 #5번 임시로 시도 중 
