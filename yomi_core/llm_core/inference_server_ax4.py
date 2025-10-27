@@ -37,9 +37,9 @@ async def handle_connection(websocket):
 async def main():
     global responder
     responder = LLMResponder()
-    print("[LLM 서버] 시작됨 (ws://0.0.0.0:8765)")
+    print("[LLM 서버] 시작됨 (ws://127.0.0.1:8765)")
 
-    async with websockets.serve(handle_connection, "0.0.0.0", 8765):
+    async with websockets.serve(handle_connection, "127.0.0.1", 8765):
         await asyncio.Future()
 
 if __name__ == "__main__":
