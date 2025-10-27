@@ -19,7 +19,7 @@ class EmotionJsonPicker:
     """
     EMOTIONS_DEFAULT = [
         "joy", "sadness", "angry", "fear",
-        "surprise", "disgust", "trust", "anticipation", "no"
+        "surprise", "disgust", "trust", "anticipation"
     ]
 
     def __init__(
@@ -33,7 +33,7 @@ class EmotionJsonPicker:
         encoding: str = "utf-8",
         on_round_complete: Optional[Callable[[str], None]] = None,
         # LLM 설정 (같은 클래스 내부)
-        llm_temperature: float = 0.2,
+        llm_temperature: float = 0.8,
         enable_llm: bool = True,
     ):
         """
@@ -72,7 +72,7 @@ class EmotionJsonPicker:
 
         # LLM 설정/클라이언트
         self.enable_llm = enable_llm
-        self.openai_model = "ft:gpt-4o-2024-08-06:personal::CR1Ggcr5"
+        self.openai_model = "ft:gpt-4o-2024-08-06:personal::CSlEHroN"
         self.llm_temperature = llm_temperature
         self._openai_client = None
         load_dotenv()
@@ -221,26 +221,48 @@ class EmotionJsonPicker:
 
     def _llm_generate_json(self, key: str) -> Any:
         """
-        LLM을 호출해 JSON-serializable 객체를 반환.
-        모델은 self.openai_model 사용, 프롬프트는 감정 key 하나로 단순화.
+        Fine-tuned 모델에 맞춰 ChatML 형식으로 프롬프트 구성.
+        JSON 배열만 반환되도록 유도하고, 문자열로 받은 후 파싱.
         """
         client = self._openai_client
+
+        # 파인튜닝에 사용된 system 프롬프트 그대로 사용
+        system_prompt = (
+            "You are a robot motion generator that outputs a JSON array representing a dynamic and expressive motion sequence matching the given emotion."
+            "The sequence should contain at least 3 timestamps with varying motor speeds, positions, and servo angles that reflect the intensity and characteristics of the emotion."
+            "Ensure each motion output differs naturally, as real-life motion would. Only output the raw JSON array, no explanations or markdown."
+        )
+
+        user_prompt = f"Generate a motion sequence for the emotion: {key}."
+
+
         resp = client.chat.completions.create(
             model=self.openai_model,
             messages=[
-                # {"role":"system", "content":"다음 감정에 대해 JSON 객체를 생성하십시오."},
-                {"role": "user", "content": key},
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},  # 감정 키워드만!
             ],
-            # response_format={"type": "json_object"},
-            # temperature=self.llm_temperature,
+            temperature=self.llm_temperature,
+            timeout=30,
         )
-        text = resp.choices[0].message.content
+
+        text = resp.choices[0].message.content.strip()
+
+        # 혹시 코드블록 있으면 제거
+        import re, json
+        text = re.sub(r"^```json\s*|\s*```$", "", text, flags=re.DOTALL).strip()
+
+        # JSON 파싱
         try:
-            return json.loads(text)
+            parsed = json.loads(text)
+            if isinstance(parsed, list):
+                return parsed
+            else:
+                print("[⚠️] JSON 리스트 형식이 아닙니다.")
+                return {"raw_output": text}
         except json.JSONDecodeError:
-            # 모델이 JSON만 반환하지 못하는 경우 대비
-            print(f"[EmotionJsonPicker] LLM이 유효하지 않은 JSON을 반환했습니다: {text}")
-            raise RuntimeError(f"LLM이 '{key}'에 대해 유효한 JSON을 반환하지 못했습니다.") from e
+            print("[⚠️] JSON 파싱 실패. 원본 저장합니다.\n", text)
+            return {"raw_output": text}
 
     def _dummy_generate_json(self, key: str) -> Any:
         """LLM 비활성 시 사용할 더미 생성기(테스트용)."""
