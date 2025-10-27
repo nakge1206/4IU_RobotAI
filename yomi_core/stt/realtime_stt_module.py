@@ -24,11 +24,10 @@ class STTModule:
         result = self.recorder.text()
         if result:
             if self.on_text_callback is not None:
-            		self.on_text_callback(result)
+                    self.on_text_callback(result)
             else:
-            	print(result)
+                print(result)
             
-
     def start(self):
         """ stt 실행 """
         self._run()
@@ -41,6 +40,7 @@ class STTModule:
         """ stt 마이크 비활성화 (일시정지)"""
         print("[STT] micOFF")
         self.isMic = False
+        # self.recorder.stop()
         self.recorder.set_microphone(False)
         
 
@@ -48,6 +48,7 @@ class STTModule:
         """ stt 마이크 활성화 (제개)"""
         if not self.isMic:
             print("[STT] micON")
+            # self.recorder.start()
             self.recorder.set_microphone(True)
             self.isMic = True
             self._run()

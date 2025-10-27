@@ -44,9 +44,23 @@ class LLMClient:
         payload = {"text": text, "mbti": mbti}
         future = asyncio.run_coroutine_threadsafe(self._send(payload), self.loop)
         return future.result()
+
+    def send_special(self, text):
+        if self.websocket is None:
+            self.connect()
+        payload = text 
+        future = asyncio.run_coroutine_threadsafe(self._send(payload), self.loop)
+        return future.result()
     
     async def _send(self, payload):
-        await self.websocket.send(json.dumps(payload, ensure_ascii=False))
+        message_to_send = ""
+        if isinstance(payload, dict):
+            # 1. 딕셔너리면 -> JSON으로 변환 (일반 채팅)
+            message_to_send = json.dumps(payload, ensure_ascii=False)
+        else:
+            # 2. 딕셔너리가 아니면 -> String 그대로 사용 (특수 신호)
+            message_to_send = str(payload) # 혹시 모르니 str() 처리
+        await self.websocket.send(message_to_send)
         response = await self.websocket.recv()
         return response
 
@@ -57,6 +71,11 @@ class LLMClient:
                 msg = input("질문 (종료: ㅂㅂ): ").strip()
                 if msg.lower() in ['ㅂㅂ', 'exit', 'quit']:
                     break
+                if msg.lower() in ['special']:
+                    aa = input("String 문자 : ").strip()
+                    res = self.send_special(aa)
+                    print("로봇 응답:", res)
+                    continue
                 # 필요하면 매번 또는 최초 1회 MBTI 코드 입력
                 mbti_in = input("MBTI 코드 입력 (I/E, 건너뛰기 Enter): ").strip().upper()
                 payload = {"question": msg, "mbti_code": mbti_in}

@@ -202,7 +202,14 @@ class YoloWorker(threading.Thread):
         while self.running:
             ret, frame = cap.read()
             #print(frame.shape)
-            if not ret:
+            if not ret: # 이미지가 제대로 읽히지 않을때
+                print("[VisionFace] [YoloWorker] 프레임 읽기 실패. 카메라를 재연결 시도합니다.")
+                cap.release()  # 이전 카메라 객체를 종료
+                for i in range(6):  # 0부터 5까지 다시 시도
+                    cap = cv2.VideoCapture(i)
+                    if cap.isOpened():
+                        print(f"[VisionFace] [YoloWorker] 카메라 {i} 열기 성공")
+                        break
                 continue
             #이미지 반전
             # frame = cv2.flip(frame, -1)

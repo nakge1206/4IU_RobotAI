@@ -79,7 +79,10 @@ class Yomi:
         self.vision_location = None
 
         self.switch_position = None
-        
+
+        #yomi기록저장
+        current_time = time.strftime('%Y-%m-%d_%H-%M-%S', time.localtime())
+        self.log_file = f"yomi_log_{current_time}.txt"
 
         #모듈 초기화
         self.stt = STTModule(on_text_callback=self.handle_stt) if isSTT else None
@@ -150,6 +153,8 @@ class Yomi:
     def _sttStart(self):
         """STT모듈 멀티스레드로 시작 후, 1초마다 실행여부 판단"""
         self.stt.start()
+        # stt_main_thread = threading.Thread(target=self.stt.start, daemon=True)
+        # stt_main_thread.start()
         while True:
             time.sleep(1)
             self._sttResume()
@@ -163,6 +168,16 @@ class Yomi:
         """STT 마이크 활성화"""
         if self.joy_master_flag and self.isSTT and not self.is_tts_running and self.sttEnable and not self.switch_flag and not self.vision_flag:
             self.stt.micOn()
+
+    def write_log(self, log_message):
+        """로그를 텍스트 파일로 저장하는 함수 (멀티스레딩 지원)"""
+        log_thread = threading.Thread(target=self._save_log, args=(log_message,))
+        log_thread.start()
+    
+    def _save_log(self, log_message):
+        """로그 파일에 메시지를 저장하는 함수"""
+        with open(self.log_file, 'a', encoding='utf-8') as log:
+            log.write(f"{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())} - {log_message}\n")
     
     def handle_stt(self, stt_texts):
         """STT발생 시 처리 함수"""
@@ -171,6 +186,9 @@ class Yomi:
             self.sttEnable = False
             self.stt_text, self.stt_info = stt_texts
         self._sttPause()
+        
+        # 로그 기록
+        self.write_log(f"입력된 말: {self.stt_text}")
 
         #STT Timeout
         if self.sttTimer:
@@ -186,7 +204,6 @@ class Yomi:
                 args=(self.make_prompt("main_llm"),),
                 daemon=True
             ).start()
-            # self.handle_main_llm(self.make_prompt("main_llm"))
         
         #STT Timeout 재설정
         self.sttTimer = threading.Timer(self.stt_timeout, self._vision_open)
@@ -207,6 +224,9 @@ class Yomi:
         if self.isVisionFace and self.joy_master_flag and self.isVisionFace and self.visionEnable:
             print("[YOMI] (handle_vision) STT timeout - vision 실행")
             print(f"[YOMI] (handle_vision) 감지 객체 :  {self.lastVision}")
+
+            # 로그 기록
+            self.write_log(f"Timeout_감지 객체: {self.lastVision}")
             
             with self.lock:
                 self.visionEnable = False
@@ -241,6 +261,9 @@ class Yomi:
             }
             if index in touch_map:
                 print(f"[YOMI] (handle_switch) 눌린 부위: {touch_map[index]} (switch={index}) \n")
+                
+                # 로그 기록
+                self.write_log(f"눌린 부위 : {touch_map[index]}")
                 
                 with self.lock:
                     self.switch_flag = True
@@ -291,7 +314,7 @@ class Yomi:
         else:
             for item in vision_copy:
                 label = item['label']
-                prompt.append(f"시각 정보 : {label}이 있습니다.\n")
+                prompt.append(f"시각 정보 : {label}이 있습니다.")
 
             """
             # 해당 부분은 좌표 정보 포함임. 필요하면 주석해제서 사용
@@ -320,6 +343,9 @@ class Yomi:
     
     def handle_main_llm(self, text):
         """메인 LLM 처리"""
+        
+        # 로그 기록
+        self.write_log(f"[생성된 프롬포트 : {text}]")
 
         #대답 및 감정 추출
         responseAndEmotion = self.llm.send(text, self.mbti)
@@ -347,6 +373,10 @@ class Yomi:
                 self.llm_response = "LLM이 이상해"
                 self.llm_emotion_KO = "no"
                 self.llm_emotion_EN = "no"
+            
+            # 로그 기록
+            self.write_log(f"유아 대답 : {self.llm_response}")
+            self.write_log(f"유아 감정 : {self.llm_emotion_KO}")
 
         #얼굴이랑 TTS에 정보전달
         if self.isVisionFace:
@@ -360,6 +390,11 @@ class Yomi:
 
         #감정에 맞는 행동 실행
         entry = self.motionPicker.pick(self.llm_emotion_EN)
+
+    def handel_llm_data_remove(self, text):
+        """String을 입력으로 특수한 상호작용을 하기위한 함수명"""
+        response = self.llm.send_special(text)
+
 
     # def handle_motor_llm(self, text):
     #     """모터 관련 LLM 처리"""
@@ -395,6 +430,7 @@ class Yomi:
         self.sttEnable = True
         self.switch_flag = False
         self.vision_flag = False
+        self._sttResume()
 
     def try_send_tts(self, response_text):
         print(f"[YOMI] (try_send_tts) TTS에서 받은 text: {response_text}")
