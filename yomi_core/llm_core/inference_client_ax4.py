@@ -89,9 +89,6 @@ class LLMClient:
                 msg = input("질문 (종료: ㅂㅂ): ").strip()
                 if msg.lower() in ['ㅂㅂ', 'exit', 'quit']:
                     break
-<<<<<<< HEAD
-                res = self.send(msg)   # ✅ MBTI 자동 기본값(INFP)
-=======
                 if msg.lower() in ['special']:
                     aa = input("String 문자 : ").strip()
                     res = self.send_special(aa)
@@ -101,7 +98,6 @@ class LLMClient:
                 mbti_in = input("MBTI 코드 입력 (I/E, 건너뛰기 Enter): ").strip().upper()
                 payload = {"question": msg, "mbti_code": mbti_in}
                 res = self.send(json.dumps(payload, ensure_ascii=False))
->>>>>>> 7ff346b0d3b23a4e8796440a0faaf1c7f7dfc3e9
                 print("로봇 응답:", res)
         except Exception as e:
             print("[클라이언트 오류]", e)
