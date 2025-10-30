@@ -23,6 +23,15 @@ import random
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"  # OpenMP 중복 방지
 
+import pathlib # 이것부터 5줄을 통해서 마치 WindowsPath가 있는것처럼 꾸미기 <- 어짜피 실제로 기능하는데는 문제가 없기 때문
+from pathlib import PosixPath
+
+# 🔧 WindowsPath를 PosixPath로 대체 (Ubuntu에서도 언피클 가능)
+class WindowsPath(PosixPath):
+    """Fake WindowsPath for loading Windows-trained models on Linux"""
+    pass
+pathlib.WindowsPath = WindowsPath
+
 class YomiFace(QWidget):
     def __init__(self):
         super().__init__()
@@ -181,7 +190,8 @@ class YoloWorker(threading.Thread):
         self.interval = interval
 
         self.frame = None
-        self.detections = None
+        self.detectInfo = None
+        self.countInfo=None
         self.running = True
         self.lock = threading.Lock()
         self.prev_time = time.time()
@@ -214,19 +224,20 @@ class YoloWorker(threading.Thread):
             #이미지 반전
             # frame = cv2.flip(frame, -1)
 
-            detection = self.detector.ObjectInfomation(frame)
+            detections, class_counts = self.detector.ObjectInfomation(frame)
             with self.lock:
                 self.frame = frame.copy()
-                self.detections = detection
+                self.detectInfo = detections
+                self.countInfo = class_counts
             time.sleep(0.01)
 
             current_time = time.time()
             if current_time - last_detection_time >= self.interval:
                 last_detection_time = current_time
                 if self.on_vision_callback:
-                    self.on_vision_callback(self.detections)
+                    self.on_vision_callback(self.detectInfo, self.countInfo)
                 if self.logger:
-                    self.logger.add(self.detections)
+                    self.logger.add(self.detectInfo, self.countInfo)
 
         cap.release()
         if self.logger:
@@ -241,12 +252,12 @@ class YoloWorker(threading.Thread):
     def _get_latest(self):
         """내부 GUI용 이미지, detection 반환 함수"""
         with self.lock:
-            return self.frame.copy() if self.frame is not None else None, self.detections
+            return self.frame.copy() if self.frame is not None else None, self.detectInfo
     
     def get_detections(self):
         """외부에서 감지 결과만 받아갈 때 사용"""
         with self.lock:
-            return self.detections.copy() if self.detections else []
+            return self.detectInfo.copy() if self.detectInfo else []
 
 class VisonFaceMain:
     def __init__(self, interval=1.0, isLog=False, on_vision_callback=None, viewGUI=True, isFPS=False, mbti="I"):

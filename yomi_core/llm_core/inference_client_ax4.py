@@ -2,6 +2,7 @@ import asyncio
 import websockets
 import threading
 import json
+import time
 
 class LLMClient:
     def __init__(self, uri="wss://pseudophilosophical-unextendedly-allan.ngrok-free.dev"):
@@ -21,11 +22,20 @@ class LLMClient:
         return future.result()
 
     async def _connect(self):
-        self.websocket = await websockets.connect(
-            self.uri,
-            subprotocols=["llm-protocol"]
-        )
-        print(f"[LLMClient] 서버 연결됨: {self.uri}")
+        retries = 0
+        while retries < 30:
+            try:
+                self.websocket = await websockets.connect(
+                    self.uri,
+                    subprotocols=["llm-protocol"]
+                )
+                print(f"[LLMClient] 서버 연결됨: {self.uri}")
+                return
+            except websockets.exceptions.ConnectionClosedError as e:
+                retries += 1
+                print(f"[LLMClient] 연결 실패. 3초 후 재시도")
+                time.sleep(1)
+        print(f"[LLMClient] 최대 재시도 횟수 도달. 서버 연결 실패.")
 
     def disconnect(self):
         if self.websocket:
@@ -60,9 +70,18 @@ class LLMClient:
         else:
             # 2. 딕셔너리가 아니면 -> String 그대로 사용 (특수 신호)
             message_to_send = str(payload) # 혹시 모르니 str() 처리
-        await self.websocket.send(message_to_send)
-        response = await self.websocket.recv()
-        return response
+        try:
+            await self.websocket.send(message_to_send)
+            response = await self.websocket.recv()
+            return response
+        except websockets.exceptions.ConnectionClosedError:
+            print("[LLMClient] 연결 끊김. 재연결 시도 중...")
+            self.connect()
+
+            await self.websocket.send(message_to_send)
+            response = await self.websocket.recv()
+            return response
+
 
     async def chat_loop(self):
         self.connect()
