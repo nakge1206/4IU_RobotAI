@@ -14,12 +14,16 @@ class RealtimeObjectDetection:
 
     def load_model(self): # 학습된 데이터 셋 불러오는 함수
         # model = torch.hub.load('ultralytics/yolov5', 'yolov5s', pretrained=True) # yolov5에 어떤 dataset을 쓸건지
+        # model_path = '/home/micca/catkin_ws/src/4IU_RobotAI/yomi_core/vision_face/yolo_nomal_x/custom_yolo_nomal_x/weights/best_linux.pt'
+        # model_path = '/home/micca/catkin_ws/src/4IU_RobotAI/yomi_core/vision_face/yolo_nomal_x/custom_yolo_nomal_x/weights/best.pt'
+        model_path = '/home/micca/Downloads/DEL_yolov5/yolov5m.pt'
         
         model = torch.hub.load( ## 학습된 커스텀 파일 경로
             'ultralytics/yolov5',
             'custom',
-            path='/home/micca/catkin_ws/src/4IU_RobotAI/yomi_core/vision_face/exp7/weights/best_m.pt' #ubuntu
+            path=model_path, #ubuntu
             # path='C:/Users/COM/Desktop/yomi/4IU_RobotAI/yomi_core/vision_face/exp7/weights/best.pt' #window
+            force_reload=True
         )
         return model
 
@@ -33,21 +37,24 @@ class RealtimeObjectDetection:
         x_shape, y_shape = frame[0].shape[1], frame[0].shape[0]
         detections = []
 
+        class_counts = {}
+
         for i in range(len(labels)):
-            row = cords[i] 
-            if row[4] >= 0.3:  # 감지 적중률 0.3이상만 감지
+            row = cords[i]
+            if row[4] >= 0.4:  # 감지 적중률 0.4 이상만 감지
                 x1 = int(row[0] * x_shape) # 좌표 원래 이미지 크기로 변환
                 y1 = int(row[1] * y_shape)
                 x2 = int(row[2] * x_shape)
                 y2 = int(row[3] * y_shape)
-                class_name = self.class_to_label(labels[i]) #객체 이름 변환
+                class_name = self.class_to_label(labels[i]) # 객체 이름 변환
                 detections.append({ # 리스트에 단일 객체 감지 결과 저장
                     'label': class_name,
                     'confidence': float(row[4]),
                     'box': [x1, y1, x2, y2]
                 })
+                class_counts[class_name] = class_counts.get(class_name, 0) + 1
 
-        return detections
+        return detections, class_counts
 
     def class_to_label(self, x): # 클래스 번호를 문자열로 바꾸는 함수
         return self.classes[int(x)] 

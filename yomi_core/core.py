@@ -19,13 +19,9 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'stt'))
 sys.path.append(os.path.join(os.path.dirname(__file__), 'llm_core'))
 sys.path.append(os.path.join(os.path.dirname(__file__), 'tts'))
 sys.path.append(os.path.join(os.path.dirname(__file__), 'vision_face'))
-current_dir = os.path.dirname(os.path.abspath(__file__))
-base_dir = os.path.abspath(os.path.join(current_dir, ".."))
-yomi_driving_path = os.path.join(base_dir, "yomi_motor/scripts")
-yomi_motor_path = os.path.join(base_dir, "yomi_motor")
-sys.path.append(yomi_driving_path)
-sys.path.append(yomi_motor_path)
-# sys.path.append(os.path.abspath('./yomi_motor'))
+path_4IU_RobotAI=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(path_4IU_RobotAI)
+sys.path.append(os.path.join(path_4IU_RobotAI, 'yomi_motor'))
 
 
 # 각 모듈 임포트
@@ -33,11 +29,19 @@ from stt.realtime_stt_module import STTModule           #STT
 from tts.TTS_server import TTSServer, VITS, TTSClient   #TTS
 from vision_face.VisionFace import VisonFaceMain        #Vision
 from llm_core.inference_client_ax4 import LLMClient     #LLM
-from yomi_motor_core import motorCore                   #Motor_LLM
-from yomi_motion import MotionController                #MotionController
-from yomi_motor.yomi_motor import EmotionJsonPicker               #MotionPicker
-# from yomi_motor.scripts.yomi_motor_core import motorCore#Motor
-# from yomi_motor.scripts.yomi_motion import MotionController
+from yomi_motor.yomi_motor_main import EmotionJsonPicker               #MotionPicker
+# from yomi_motor_core import motorCore                   #Motor_LLM
+# from yomi_motion import MotionController                #MotionController
+# from yomi_motor.scripts.DEL_yomi_motor_core import motorCore#Motor
+# from yomi_motor.scripts.DEL_yomi_motion import MotionController
+import pathlib # 이것부터 5줄을 통해서 마치 WindowsPath가 있는것처럼 꾸미기 <- 어짜피 실제로 기능하는데는 문제가 없기 때문
+from pathlib import PosixPath
+
+# 🔧 WindowsPath를 PosixPath로 대체 (Ubuntu에서도 언피클 가능)
+class WindowsPath(PosixPath):
+    """Fake WindowsPath for loading Windows-trained models on Linux"""
+    pass
+pathlib.WindowsPath = WindowsPath
 
 
 class Yomi:
@@ -83,7 +87,10 @@ class Yomi:
         self.vision_location = None
 
         self.switch_position = None
-        
+
+        #yomi기록저장
+        current_time = time.strftime('%Y-%m-%d_%H-%M-%S', time.localtime())
+        self.log_file = f"yomi_log_{current_time}.txt"
 
         #모듈 초기화
         self.stt = STTModule(on_text_callback=self.handle_stt) if isSTT else None
@@ -101,8 +108,8 @@ class Yomi:
         print("▶ initial counts:", self.motionPicker.counts())
         self.VisionFace = VisonFaceMain(interval=2, on_vision_callback=self.handle_vision, viewGUI=True, mbti=self.mbti) if isVisionFace else None
         print(f"[YOMI] VisionFace : 준비완료 ({isVisionFace})")
-        self.motor_core = motorCore()
-        self.motor_controller = MotionController(self.VisionFace)
+        # self.motor_core = motorCore()
+        # self.motor_controller = MotionController(self.VisionFace)
         
         #ROS
         try:
@@ -154,6 +161,8 @@ class Yomi:
     def _sttStart(self):
         """STT모듈 멀티스레드로 시작 후, 1초마다 실행여부 판단"""
         self.stt.start()
+        # stt_main_thread = threading.Thread(target=self.stt.start, daemon=True)
+        # stt_main_thread.start()
         while True:
             time.sleep(1)
             self._sttResume()
@@ -167,6 +176,16 @@ class Yomi:
         """STT 마이크 활성화"""
         if self.joy_master_flag and self.isSTT and not self.is_tts_running and self.sttEnable and not self.switch_flag and not self.vision_flag:
             self.stt.micOn()
+
+    def write_log(self, log_message):
+        """로그를 텍스트 파일로 저장하는 함수 (멀티스레딩 지원)"""
+        log_thread = threading.Thread(target=self._save_log, args=(log_message,))
+        log_thread.start()
+    
+    def _save_log(self, log_message):
+        """로그 파일에 메시지를 저장하는 함수"""
+        with open(self.log_file, 'a', encoding='utf-8') as log:
+            log.write(f"{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())} - {log_message}\n")
     
     def handle_stt(self, stt_texts):
         """STT발생 시 처리 함수"""
@@ -190,21 +209,26 @@ class Yomi:
                 args=(self.make_prompt("main_llm"),),
                 daemon=True
             ).start()
-            # self.handle_main_llm(self.make_prompt("main_llm"))
         
         #STT Timeout 재설정
         self.sttTimer = threading.Timer(self.stt_timeout, self._vision_open)
         self.sttTimer.start()
     
     def _vision_open(self):
+        #tiemout 설정되면 이거 실행됨
         #todo : 여기서 고개 돌아다니면서 확인하는 모션 함수 추가하면 될듯
         self.visionEnable = True
-        self.motor_controller.wait_command()
+        # self.handle_vision()
+        # self.motor_controller.wait_command()
 
-    def handle_vision(self, visionText=None):
-        """STT N초 이상 안들어오면 vision 정보 활용"""
+    def handle_vision(self, detectInfo=None, countInfo=None):
+        """
+        STT N초 이상 안들어오면 vision 정보 활용
+        detectInfo = 감지된 객체의 모든 값(중복 허용) [{label, confidence, box}]
+        countInfo = 감지된 각 객체의 갯수 {label:count}
+        """
         with self.lock:
-            self.lastVision = visionText
+            self.lastVision = countInfo
         
         if self.isVisionFace and self.joy_master_flag and self.isVisionFace and self.visionEnable:
             print("[YOMI] (handle_vision) STT timeout - vision 실행")
@@ -278,7 +302,7 @@ class Yomi:
             switch_llm = self.switch_llm
             stt_text = self.stt_text
             switch_position = self.switch_position
-            vision_copy = list(self.lastVision) if self.lastVision else None
+            vision_copy = self.lastVision if self.lastVision else None
             llm_response = self.llm_response
             llm_emotion_EN = self.llm_emotion_EN
             mbti = self.mbti
@@ -289,11 +313,17 @@ class Yomi:
             prompt.append(f"스위치 입력 : {switch_position} 부위를 강타당함. \n")
         
         if not vision_copy:
-            prompt.append("시각정보 : 감지된 것이 없음\n")
+            prompt.append("시각정보 : 감지된 것이 없음")
         else:
-            for item in vision_copy:
-                label = item['label']
-                prompt.append(f"시각 정보 : {label}이 있습니다.\n")
+            if isinstance(vision_copy, dict): # 1) vision_copy가 countInfo(dict: {'label': count})인 경우 그대로 사용
+                counts = vision_copy
+            else: # 2) vision_copy가 detectInfo(list: [{'label', 'confidence', 'box'}...])면 집계해서 사용
+                from collections import Counter
+                counts = Counter([item['label'] for item in vision_copy if 'label' in item])
+            # 정렬은 선택(가독성용): 라벨명 알파벳/가나다 순
+            for label, n in sorted(counts.items(), key=lambda kv: kv[0]):
+                prompt.append(f"시각정보 : {label}이 {n}개 있습니다.\n")
+
 
             """
             # 해당 부분은 좌표 정보 포함임. 필요하면 주석해제서 사용
@@ -322,7 +352,6 @@ class Yomi:
     
     def handle_main_llm(self, text):
         """메인 LLM 처리"""
-
         #대답 및 감정 추출
         responseAndEmotion = self.llm.send(text, self.mbti)
 
@@ -349,6 +378,11 @@ class Yomi:
                 self.llm_response = "LLM이 이상해"
                 self.llm_emotion_KO = "no"
                 self.llm_emotion_EN = "no"
+            
+            # 로그 기록
+            log = f"입력된 말: {self.stt_text} \n Timeout_감지 객체: {self.lastVision} \n 눌린 부위 : {self.switch_position} \n [생성된 프롬포트 : {text}] \n 유아 대답 : {self.llm_response} \n 유아 감정 : {self.llm_emotion_KO}"
+            self.write_log(log)
+
 
         #얼굴이랑 TTS에 정보전달
         if self.isVisionFace:
@@ -363,24 +397,29 @@ class Yomi:
         #감정에 맞는 행동 실행
         entry = self.motionPicker.pick(self.llm_emotion_EN)
 
-    def handle_motor_llm(self, text):
-        """모터 관련 LLM 처리"""
-        print(f"[YOMI] (handle_motor_llm) MOTOR_LLM 실행됨")
-        func_name = self.motor_core.ask_finetuned_model(text)
-        print(f"[YOMI] (handle_motor_llm) MOTOR_LLM 결과 : {func_name}")
+    def handel_llm_data_remove(self, text):
+        """String을 입력으로 특수한 상호작용을 하기위한 함수명"""
+        response = self.llm.send_special(text)
 
-        if hasattr(self.motor_controller, func_name):
-            func = getattr(self.motor_controller, func_name)
-            print(f"[YOMI] [hadle_motor_llm] '{func_name}' 함수실행.")
-            if callable(func):
-                func()
-            else:
-                print(f"[YOMI] [hadle_motor_llm] Warning :'{func_name}'은 함수가 아닙니다.")
-        else:
-            print(f"[[YOMI] [hadle_motor_llm] Warning : MotionController에 '{func_name}' 함수 없음.")
-        self.motor_controller.finger_end()
-        self.stt_llm = False
-        self.switch_llm = False
+
+    # def handle_motor_llm(self, text):
+    #     """모터 관련 LLM 처리"""
+    #     print(f"[YOMI] (handle_motor_llm) MOTOR_LLM 실행됨")
+    #     func_name = self.motor_core.ask_finetuned_model(text)
+    #     print(f"[YOMI] (handle_motor_llm) MOTOR_LLM 결과 : {func_name}")
+
+    #     if hasattr(self.motor_controller, func_name):
+    #         func = getattr(self.motor_controller, func_name)
+    #         print(f"[YOMI] [hadle_motor_llm] '{func_name}' 함수실행.")
+    #         if callable(func):
+    #             func()
+    #         else:
+    #             print(f"[YOMI] [hadle_motor_llm] Warning :'{func_name}'은 함수가 아닙니다.")
+    #     else:
+    #         print(f"[[YOMI] [hadle_motor_llm] Warning : MotionController에 '{func_name}' 함수 없음.")
+    #     self.motor_controller.finger_end()
+    #     self.stt_llm = False
+    #     self.switch_llm = False
 
 
     def on_tts_start(self):
@@ -397,6 +436,7 @@ class Yomi:
         self.sttEnable = True
         self.switch_flag = False
         self.vision_flag = False
+        self._sttResume()
 
     def try_send_tts(self, response_text):
         print(f"[YOMI] (try_send_tts) TTS에서 받은 text: {response_text}")

@@ -23,6 +23,15 @@ import random
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"  # OpenMP 중복 방지
 
+import pathlib # 이것부터 5줄을 통해서 마치 WindowsPath가 있는것처럼 꾸미기 <- 어짜피 실제로 기능하는데는 문제가 없기 때문
+from pathlib import PosixPath
+
+# 🔧 WindowsPath를 PosixPath로 대체 (Ubuntu에서도 언피클 가능)
+class WindowsPath(PosixPath):
+    """Fake WindowsPath for loading Windows-trained models on Linux"""
+    pass
+pathlib.WindowsPath = WindowsPath
+
 class YomiFace(QWidget):
     def __init__(self):
         super().__init__()
@@ -181,14 +190,21 @@ class YoloWorker(threading.Thread):
         self.interval = interval
 
         self.frame = None
-        self.detections = None
+        self.detectInfo = None
+        self.countInfo=None
         self.running = True
         self.lock = threading.Lock()
         self.prev_time = time.time()
 
     def run(self):
-        cap = cv2.VideoCapture(0)
-        if not cap.isOpened():
+        cap = None
+        for i in range(6):
+            cap = cv2.VideoCapture(i)
+            if cap.isOpened():
+                break
+        if cap.isOpened():
+            print(f"[VisionFace] [YoloWorker] 카메라 {i} 열기 성공")
+        else:
             print("[VisionFace] [YoloWorker] 카메라 열기 실패")
             return
         
@@ -196,24 +212,32 @@ class YoloWorker(threading.Thread):
         while self.running:
             ret, frame = cap.read()
             #print(frame.shape)
-            if not ret:
+            if not ret: # 이미지가 제대로 읽히지 않을때
+                print("[VisionFace] [YoloWorker] 프레임 읽기 실패. 카메라를 재연결 시도합니다.")
+                cap.release()  # 이전 카메라 객체를 종료
+                for i in range(6):  # 0부터 5까지 다시 시도
+                    cap = cv2.VideoCapture(i)
+                    if cap.isOpened():
+                        print(f"[VisionFace] [YoloWorker] 카메라 {i} 열기 성공")
+                        break
                 continue
             #이미지 반전
             # frame = cv2.flip(frame, -1)
 
-            detection = self.detector.ObjectInfomation(frame)
+            detections, class_counts = self.detector.ObjectInfomation(frame)
             with self.lock:
                 self.frame = frame.copy()
-                self.detections = detection
+                self.detectInfo = detections
+                self.countInfo = class_counts
             time.sleep(0.01)
 
             current_time = time.time()
             if current_time - last_detection_time >= self.interval:
                 last_detection_time = current_time
                 if self.on_vision_callback:
-                    self.on_vision_callback(self.detections)
+                    self.on_vision_callback(self.detectInfo, self.countInfo)
                 if self.logger:
-                    self.logger.add(self.detections)
+                    self.logger.add(self.detectInfo, self.countInfo)
 
         cap.release()
         if self.logger:
@@ -228,12 +252,12 @@ class YoloWorker(threading.Thread):
     def _get_latest(self):
         """내부 GUI용 이미지, detection 반환 함수"""
         with self.lock:
-            return self.frame.copy() if self.frame is not None else None, self.detections
+            return self.frame.copy() if self.frame is not None else None, self.detectInfo
     
     def get_detections(self):
         """외부에서 감지 결과만 받아갈 때 사용"""
         with self.lock:
-            return self.detections.copy() if self.detections else []
+            return self.detectInfo.copy() if self.detectInfo else []
 
 class VisonFaceMain:
     def __init__(self, interval=1.0, isLog=False, on_vision_callback=None, viewGUI=True, isFPS=False, mbti="I"):

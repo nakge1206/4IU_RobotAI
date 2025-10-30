@@ -35,4 +35,22 @@ detections_log.json
 
 #TTS
 yomi_core/tts/checkpoints/
-yomi_core/tts/example/filelists/
+yomi_core/tts/example/filelists/# === Model / Weights / Artifacts ===
+
+
+yomi_core/vision_face/**/weights/
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.bin
+
+# (선택) 데이터/로그 등 산출물
+*.wav
+*.zip
+*.tar
+*.tar.gz
+*.log
+runs/
+outputs/
+exp*/
