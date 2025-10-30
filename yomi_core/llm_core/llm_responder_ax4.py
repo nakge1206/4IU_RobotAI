@@ -106,11 +106,28 @@ class LLMResponder:
         # 캐릭터 초기 정보
         self.character_info = (
             "이 캐릭터는 5살 여자아이 요미야. 이름은 요미이고, MBTI는 ESTJ야. "
-            "좋아하는 건 치킨, 강아지, 술래잡기, 그림 그리기야. "
-            "무서운 건 번개고, 칭찬받으면 기뻐해."
+            "요미는 유치원에 다니지만 말을 잘 듣지 않고, 종종 장난을 치는 아이야. "
+            "대화와 경험을 통해 점점 바른 행동을 배워. "
+            "요미는 때때로 투정부리거나 짜증을 내지만, 대화를 통해 반성하고 배우는 태도를 보여야 해."
         )
 
     def wrap_prompt(self, text, emotion=None, event=None, mbti=None, vision=None):
+
+        # ---- 가중치 자동 결정 ----
+        has_text = bool(text and text.strip())
+        has_vision = bool(vision and str(vision).strip())
+
+        if has_text and has_vision:
+            text_weight  = self.modality_weights.get("speech", 0.7)
+            vision_weight = self.modality_weights.get("vision", 0.3)
+        elif has_text and not has_vision:
+            text_weight, vision_weight = 1.0, 0.0
+        elif has_vision and not has_text:
+            text_weight, vision_weight = 0.0, 1.0
+        else:
+            # 둘 다 없음: 안전한 기본 프롬프트
+            text_weight, vision_weight = 1.0, 0.0
+
         meta_info = []
         if emotion:
             meta_info.append(f"사용자 감정은 '{emotion}'이야.")
@@ -125,11 +142,24 @@ class LLMResponder:
         related = self.memory_graph.search_related(text, topk=3)
         related_str = "\n".join([f"- {r}" for r in related]) if related else "없음"
 
-        meta_str = " ".join(meta_info)
+        meta_str = " ".join(meta_info) if meta_info else "정보 없음"
+
+        # ---- 가중치 표기 + 입력 블록 ----
+        # 비어있는 입력은 '없음'으로 표기
+        in_text  = text if has_text else "없음"
+        in_vision = str(vision) if has_vision else "없음"
+
+        weighted_input = (
+            f"[입력 비중: 텍스트 {text_weight*100:.0f}%, 비전 {vision_weight*100:.0f}%]\n"
+            f"텍스트 내용: {in_text}\n"
+            f"비전 내용: {in_vision}\n"
+        )
+            
+
 
         return (
             f"### 캐릭터 요약\n{self.character_info}\n\n"
-            f"### 사용자 정보\n{meta_str if meta_str else '정보 없음'}\n\n"
+            f"### 사용자 정보\n{meta_str}\n\n"
             f"### 과거 관련 기억\n{related_str}\n\n"
             "### 시스템 지침\n"
             "너는 유아야. 입력 내용을 보고 상황에 맞는 유아 말투의 자연스러운 반응을 해줘.\n"
@@ -140,7 +170,7 @@ class LLMResponder:
             "예시:\n"
             "\"대답\": 안녕! 난 요미야!\n"
             "\"감정\": 기쁨\n\n"
-            f"### 입력 정보\n{text}\n"
+            f"### 입력 정보\n{weighted_input}\n"
             "### 출력:"
         )
 
