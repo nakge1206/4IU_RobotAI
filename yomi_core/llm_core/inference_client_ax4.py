@@ -50,7 +50,6 @@ class LLMClient:
     def send(self, text, mbti="INFP"):
         if self.websocket is None:
             self.connect()
-        # ✅ 딕셔너리 형태로 전송
         payload = {"text": text, "mbti": mbti}
         future = asyncio.run_coroutine_threadsafe(self._send(payload), self.loop)
         return future.result()
