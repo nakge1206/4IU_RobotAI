@@ -5,8 +5,9 @@ stt가 반환하는 result 값은
 from audio_recorder_ko import AudioToTextRecorder
 
 class STTModule:
-    def __init__(self, on_text_callback=None):
+    def __init__(self, on_text_callback=None, on_recoding_callback=None):
         self.on_text_callback = on_text_callback
+        self.on_recoding_callback = on_recoding_callback
         self.recorder = AudioToTextRecorder(
             language="ko", 
             spinner = True, #마이크 입력 등에 대해 돌아가는 애니메이션 및 글자 출력 여부
@@ -16,7 +17,8 @@ class STTModule:
             print_transcription_time=True, #지연율 출력
             debug_mode = False, # 콘솔에 디버그 정보를 출력
             allowed_latency_limit = 100, #큐에 저장하는 최대 청크 수
-            no_log_file = False # False면 디버그파일을 만들지 않음
+            no_log_file = False, # False면 디버그파일을 만들지 않음
+            on_recording_start=self.handle_recoding # 음성 인지 후 녹음 시작 콜백 함수
         )
         self.isMic = True
 
@@ -52,6 +54,11 @@ class STTModule:
             self.recorder.set_microphone(True)
             self.isMic = True
             self._run()
+
+    def handle_recoding(self):
+        """ STT recoding 시작 콜백 함수 """
+        if self.on_recoding_callback is not None:
+            self.on_recoding_callback()
 
 
 if __name__ == "__main__":

@@ -93,7 +93,7 @@ class Yomi:
         self.log_file = f"yomi_log_{current_time}.txt"
 
         #모듈 초기화
-        self.stt = STTModule(on_text_callback=self.handle_stt) if isSTT else None
+        self.stt = STTModule(on_text_callback=self.handle_stt, on_recoding_callback=self.handle_stt_recoding) if isSTT else None
         print(f"[YOMI] STT : 준비완료 ({isSTT})")
         if isTTS:
             self.vits_model = VITS()
@@ -186,6 +186,12 @@ class Yomi:
         """로그 파일에 메시지를 저장하는 함수"""
         with open(self.log_file, 'a', encoding='utf-8') as log:
             log.write(f"{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())} - {log_message}\n")
+
+    def handle_stt_recoding(self):
+        """STT recoding 시작 콜백 함수"""
+        #STT Timeout
+        if self.sttTimer:
+            self.sttTimer.cancel()
     
     def handle_stt(self, stt_texts):
         """STT발생 시 처리 함수"""
