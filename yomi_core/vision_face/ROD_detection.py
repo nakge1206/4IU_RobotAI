@@ -16,7 +16,7 @@ class RealtimeObjectDetection:
         # model = torch.hub.load('ultralytics/yolov5', 'yolov5s', pretrained=True) # yolov5에 어떤 dataset을 쓸건지
         # model_path = '/home/micca/catkin_ws/src/4IU_RobotAI/yomi_core/vision_face/yolo_nomal_x/custom_yolo_nomal_x/weights/best_linux.pt'
         # model_path = '/home/micca/catkin_ws/src/4IU_RobotAI/yomi_core/vision_face/yolo_nomal_x/custom_yolo_nomal_x/weights/best.pt'
-        model_path = '/home/micca/Downloads/DEL_yolov5/yolov5m.pt'
+        model_path = '/home/micca/Downloads/DEL_yolov5/best_lt.pt'
         
         model = torch.hub.load( ## 학습된 커스텀 파일 경로
             'ultralytics/yolov5',
@@ -41,7 +41,7 @@ class RealtimeObjectDetection:
 
         for i in range(len(labels)):
             row = cords[i]
-            if row[4] >= 0.4:  # 감지 적중률 0.4 이상만 감지
+            if row[4] >= 0.5:  # 감지 적중률 0.5 이상만 감지
                 x1 = int(row[0] * x_shape) # 좌표 원래 이미지 크기로 변환
                 y1 = int(row[1] * y_shape)
                 x2 = int(row[2] * x_shape)

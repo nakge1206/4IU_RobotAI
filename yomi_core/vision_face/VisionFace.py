@@ -362,6 +362,8 @@ class VisonFaceMain:
                     if cv2.waitKey(1) & 0xFF == ord('q'):
                         self.running = False
                         break
+            if detections:
+                print("[VisionFace] 감지:", self.yoloWorker.countInfo)
             
             #PyQt 실행 함수
             self.controller.check_no_face()
