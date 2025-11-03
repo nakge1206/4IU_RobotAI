@@ -5,7 +5,7 @@ import json
 import time
 
 class LLMClient:
-    def __init__(self, uri="wss://pseudophilosophical-unextendedly-allan.ngrok-free.dev"):
+    def __init__(self, uri="wss://invertible-eugenia-uninherently.ngrok-free.dev"):
         self.uri = uri
         self.websocket = None
         
