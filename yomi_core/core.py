@@ -327,8 +327,10 @@ class Yomi:
                 from collections import Counter
                 counts = Counter([item['label'] for item in vision_copy if 'label' in item])
             # 정렬은 선택(가독성용): 라벨명 알파벳/가나다 순
+            prompt.append("시각정보 : ")
             for label, n in sorted(counts.items(), key=lambda kv: kv[0]):
-                prompt.append(f"시각정보 : {label}이 {n}개 있습니다.\n")
+                prompt.append(f"{label}이 {n}개 있습니다.\t")
+            prompt.append("\n")
 
 
             """
@@ -386,7 +388,7 @@ class Yomi:
                 self.llm_emotion_EN = "no"
             
             # 로그 기록
-            log = f"입력된 말: {self.stt_text} \n Timeout_감지 객체: {self.lastVision} \n 눌린 부위 : {self.switch_position} \n [생성된 프롬포트 : {text}] \n 유아 대답 : {self.llm_response} \n 유아 감정 : {self.llm_emotion_KO}"
+            log = f"[입력된 정보 : \n{text}] \n 유아 대답:[{self.llm_emotion_KO}] {self.llm_response}\n"
             self.write_log(log)
 
 
