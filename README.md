@@ -91,7 +91,7 @@ YOMI 로봇은 예비 교사의 훈련을 위해 다음과 같은 핵심 기능�
 | 카테고리 | 기술 |
 | :--- | :--- |
 | **하드웨어** | `Jetson Orin NX`, `LiDAR`, `XM430-350R Motor` |
-| **인공지능** | `PyTorch`, `YOLOv5`, 'SenseVoice', 'A.X 4.0', 'VITS'  |
+| **인공지능** | `PyTorch`, `YOLOv5`, `SenseVoice`, `A.X 4.0`, `VITS`  |
 | **프로그래밍** | `Python`, `C++` |
 | **프레임워크** | `ROS (Robot Operating System)` |
 
